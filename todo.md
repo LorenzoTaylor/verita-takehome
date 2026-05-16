@@ -117,7 +117,7 @@ Note: event stream is mocked — in production a queue (Kafka/SQS) sits in front
 - [x] `PATCH /ops/invoices/{id}/line-items/{id}` — override line item, write audit log
 
 ### Backend — Webhook
-- [ ] `POST /webhooks/payments` — verify signature, dedup delivery ID, mark invoice paid
+- [x] `POST /webhooks/payments` — verify signature, dedup delivery ID, mark invoice paid
 
 ### Background Jobs
 - [x] Job runner — poll jobs table on interval, `SKIP LOCKED` claim, dispatch by type
@@ -126,11 +126,11 @@ Note: event stream is mocked — in production a queue (Kafka/SQS) sits in front
 - [x] Anomaly job — compute rolling 30-day averages, write `anomaly_flags` for each signal type
 
 ### Seed / Generator Script
-- [ ] Create N customers with API keys
-- [ ] Generate usage events at realistic rate (200/sec sustained, bursts)
-- [ ] Introduce duplicate `request_id`s to test idempotency
-- [ ] Introduce late-arriving events
-- [ ] Seed price plans, ops users
+- [x] Create N customers with API keys
+- [x] Generate usage events at realistic rate (200/sec sustained, bursts)
+- [x] Introduce duplicate `request_id`s to test idempotency
+- [x] Introduce late-arriving events
+- [x] Seed price plans, ops users
 
 ### Customer Frontend (`frontend/customer`)
 - [ ] Auth — API key entry, store in memory (not localStorage)
