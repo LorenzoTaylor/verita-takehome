@@ -73,35 +73,35 @@ Note: event stream is mocked — in production a queue (Kafka/SQS) sits in front
 ## Todo
 
 ### Infrastructure
-- [ ] Init Cargo workspace (`backend/`)
-- [ ] Init two Vite + React + TS apps (`frontend/customer/`, `frontend/ops/`)
-- [ ] Write `docker-compose.yml` — postgres, backend, customer frontend, ops frontend
-- [ ] Write `.env.example` — DB creds, webhook signing key, JWT secret, ops seed user
-- [ ] Write `sqlx migrate` migration files (see schema below)
+- [x] Init Cargo workspace (`backend/`)
+- [x] Init two Vite + React + TS apps (`frontend/customer/`, `frontend/ops/`)
+- [x] Write `docker-compose.yml` — postgres, backend, customer frontend, ops frontend
+- [x] Write `.env.example` — DB creds, webhook signing key, JWT secret, ops seed user
+- [x] Write `sqlx migrate` migration files (see schema below)
 
 ### Database Schema
-- [ ] `customers` — id, name, email, created_at
-- [ ] `api_keys` — id, customer_id, prefix, key_hash, created_at, revoked_at
-- [ ] `usage_events` — id, request_id (unique), customer_id, api_key_id, endpoint, units, timestamp, status (normal/late)
-- [ ] `processed_events` — request_id PK, processed_at
-- [ ] `usage_windows` — id, customer_id, window_start (hour), units_total
-- [ ] `price_plans` — id, name, effective_from, tiers (JSONB array of {up_to, unit_price_minor})
-- [ ] `customer_price_plans` — customer_id, price_plan_id, assigned_at
-- [ ] `invoices` — id, customer_id, period_start, period_end, status (draft/issued/paid), total_minor
-- [ ] `invoice_line_items` — id, invoice_id, description, units, unit_price_minor, total_minor, overridden_at
-- [ ] `credits` — id, customer_id, invoice_id, amount_minor, reason, created_by, created_at
-- [ ] `audit_log` — id, actor_id, action, entity_type, entity_id, before (JSONB), after (JSONB), reason, created_at
-- [ ] `jobs` — id, job_type, status, last_run_at, locked_at
-- [ ] `webhook_deliveries` — delivery_id PK, received_at, processed_at
-- [ ] `ops_users` — id, email, password_hash, created_at
-- [ ] `anomaly_flags` — id, customer_id, signal_type, value, threshold, flagged_at, resolved_at
-- [ ] Postgres trigger on `audit_log` — block UPDATE/DELETE
+- [x] `customers` — id, name, email, created_at
+- [x] `api_keys` — id, customer_id, prefix, key_hash, created_at, revoked_at
+- [x] `usage_events` — id, request_id (unique), customer_id, api_key_id, endpoint, units, timestamp, status (normal/late)
+- [x] `processed_events` — request_id PK, processed_at
+- [x] `usage_windows` — id, customer_id, window_start (hour), units_total
+- [x] `price_plans` — id, name, effective_from, tiers (JSONB array of {up_to, unit_price_minor})
+- [x] `customer_price_plans` — customer_id, price_plan_id, assigned_at
+- [x] `invoices` — id, customer_id, period_start, period_end, status (draft/issued/paid), total_minor
+- [x] `invoice_line_items` — id, invoice_id, description, units, unit_price_minor, total_minor, overridden_at
+- [x] `credits` — id, customer_id, invoice_id, amount_minor, reason, created_by, created_at
+- [x] `audit_log` — id, actor_id, action, entity_type, entity_id, before (JSONB), after (JSONB), reason, created_at
+- [x] `jobs` — id, job_type, status, last_run_at, locked_at
+- [x] `webhook_deliveries` — delivery_id PK, received_at, processed_at
+- [x] `ops_users` — id, email, password_hash, created_at
+- [x] `anomaly_flags` — id, customer_id, signal_type, value, threshold, flagged_at, resolved_at
+- [x] Postgres trigger on `audit_log` — block UPDATE/DELETE
 
 ### Backend — Core
-- [ ] Axum app setup, router, shared state (DB pool)
-- [ ] `AuthenticatedCustomer` extractor — resolve API key → customer, reject unknown/revoked keys
-- [ ] `OpsUser` extractor — verify JWT, reject non-ops
-- [ ] Webhook signature verification middleware
+- [x] Axum app setup, router, shared state (DB pool)
+- [x] `AuthenticatedCustomer` extractor — resolve API key → customer, reject unknown/revoked keys
+- [x] `OpsUser` extractor — verify JWT, reject non-ops
+- [x] Webhook signature verification middleware
 
 ### Backend — Customer API (`/v1`)
 - [ ] `POST /v1/events` — batch ingest, idempotency table check, insert usage_events
