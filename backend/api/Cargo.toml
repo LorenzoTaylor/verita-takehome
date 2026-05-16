@@ -3,6 +3,14 @@ name = "api"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "seed"
+path = "src/bin/seed.rs"
+
+[[bin]]
+name = "generate"
+path = "src/bin/generate.rs"
+
 [dependencies]
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
