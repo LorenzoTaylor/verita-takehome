@@ -75,7 +75,7 @@ async fn post_login(
     }
 
     let exp = (Utc::now() + Duration::hours(24)).timestamp() as usize;
-    let claims = Claims { sub: row.id.to_string(), email: body.email, exp };
+    let claims = Claims { sub: row.id.to_string(), email: body.email, exp, role: "ops".to_string() };
     let token = encode(
         &Header::default(),
         &claims,

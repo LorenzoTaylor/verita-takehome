@@ -4,23 +4,93 @@ use axum::{
     Json, Router,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
 
 use crate::{
     error::{AppError, Result},
-    extractors::customer::AuthenticatedCustomer,
+    extractors::{
+        customer::AuthenticatedCustomer,
+        customer_jwt::CustomerSession,
+        ops_user::Claims,
+    },
     state::AppState,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/auth/login", post(post_login))
         .route("/events", post(post_events))
         .route("/usage", get(get_usage))
         .route("/invoices", get(get_invoices))
         .route("/invoices/:id", get(get_invoice))
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct LoginBody {
+    email: String,
+    password: String,
+}
+
+#[derive(Serialize)]
+struct LoginResponse {
+    token: String,
+}
+
+async fn post_login(
+    State(state): State<AppState>,
+    Json(body): Json<LoginBody>,
+) -> Result<Json<LoginResponse>> {
+    #[derive(sqlx::FromRow)]
+    struct CustomerRow {
+        id: Uuid,
+        password_hash: Option<String>,
+    }
+
+    let row = sqlx::query_as::<_, CustomerRow>(
+        "SELECT id, password_hash FROM customers WHERE email = $1",
+    )
+    .bind(&body.email)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::Unauthorized)?;
+
+    let hash = row.password_hash.ok_or(AppError::Unauthorized)?;
+    let password = body.password.clone();
+    let valid = tokio::task::spawn_blocking(move || {
+        use argon2::{Argon2, PasswordHash, PasswordVerifier};
+        let parsed = PasswordHash::new(&hash).map_err(|_| ())?;
+        Argon2::default()
+            .verify_password(password.as_bytes(), &parsed)
+            .map_err(|_| ())
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    if valid.is_err() {
+        return Err(AppError::Unauthorized);
+    }
+
+    let exp = (Utc::now() + Duration::hours(24)).timestamp() as usize;
+    let claims = Claims {
+        sub: row.id.to_string(),
+        email: body.email,
+        exp,
+        role: "customer".to_string(),
+    };
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(state.jwt_secret.as_bytes()),
+    )
+    .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    Ok(Json(LoginResponse { token }))
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
@@ -156,7 +226,7 @@ fn decode_cursor(s: &str) -> Option<(DateTime<Utc>, Uuid)> {
 }
 
 pub async fn get_usage(
-    customer: AuthenticatedCustomer,
+    customer: CustomerSession,
     State(state): State<AppState>,
     Query(params): Query<UsageQuery>,
 ) -> Result<Json<PagedResponse<UsageEventRow>>> {
@@ -245,7 +315,7 @@ pub struct InvoiceDetail {
 }
 
 pub async fn get_invoices(
-    customer: AuthenticatedCustomer,
+    customer: CustomerSession,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<InvoiceRow>>> {
     let rows = sqlx::query_as::<_, InvoiceRow>(
@@ -262,7 +332,7 @@ pub async fn get_invoices(
 }
 
 pub async fn get_invoice(
-    customer: AuthenticatedCustomer,
+    customer: CustomerSession,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<InvoiceDetail>> {

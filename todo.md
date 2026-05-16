@@ -133,12 +133,12 @@ Note: event stream is mocked — in production a queue (Kafka/SQS) sits in front
 - [x] Seed price plans, ops users
 
 ### Customer Frontend (`frontend/customer`)
-- [ ] Auth — API key entry, store in memory (not localStorage)
-- [ ] Usage chart — current period, units over time
-- [ ] Usage table — cursor-paginated, filterable by date + api key
-- [ ] Invoice list
-- [ ] Invoice detail — line items, credits applied
-- [ ] Loading + error states on all data fetches
+- [x] Auth — API key entry, store in memory (not localStorage)
+- [x] Usage chart — current period, units over time
+- [x] Usage table — cursor-paginated, filterable by date + api key
+- [x] Invoice list
+- [x] Invoice detail — line items, credits applied
+- [x] Loading + error states on all data fetches
 
 ### Ops Frontend (`frontend/ops`)
 - [ ] Auth — login form, JWT stored in memory

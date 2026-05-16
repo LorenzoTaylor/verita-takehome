@@ -34,11 +34,20 @@ async fn main() -> anyhow::Result<()> {
     // Use a unique email so seed is safe to run multiple times
     let email = format!("test-{}@example.com", &key[..6].to_lowercase());
 
+    let customer_password =
+        std::env::var("CUSTOMER_SEED_PASSWORD").unwrap_or_else(|_| "customer-local-password".into());
+    let customer_salt = SaltString::generate(&mut OsRng);
+    let customer_password_hash = Argon2::default()
+        .hash_password(customer_password.as_bytes(), &customer_salt)
+        .map_err(|e| anyhow::anyhow!("hashing failed: {e}"))?
+        .to_string();
+
     let customer_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO customers (id, name, email) VALUES ($1, $2, $3)")
+    sqlx::query("INSERT INTO customers (id, name, email, password_hash) VALUES ($1, $2, $3, $4)")
         .bind(customer_id)
         .bind("Test Customer")
         .bind(&email)
+        .bind(&customer_password_hash)
         .execute(&pool)
         .await?;
 
@@ -169,12 +178,14 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     println!("Seeded successfully.");
-    println!("  Customer ID : {customer_id}");
-    println!("  API Key ID  : {key_id}");
-    println!("  API Key     : {key}");
-    println!("  Invoice ID  : {invoice_id}");
-    println!("  Ops Email   : {ops_email}");
-    println!("  Ops Password: {ops_password}");
+    println!("  Customer ID       : {customer_id}");
+    println!("  Customer Email    : {email}");
+    println!("  Customer Password : {customer_password}");
+    println!("  API Key ID        : {key_id}");
+    println!("  API Key           : {key}  (for event ingestion only)");
+    println!("  Invoice ID        : {invoice_id}");
+    println!("  Ops Email         : {ops_email}");
+    println!("  Ops Password      : {ops_password}");
     println!();
     println!("Curl examples:");
     println!("  # Ingest events");

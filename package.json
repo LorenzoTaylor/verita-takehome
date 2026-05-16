@@ -1,0 +1,13 @@
+{
+  "name": "verita-takehome",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"api,customer,ops\" --prefix-colors \"blue,green,magenta\" \"npm run dev:api\" \"npm run dev:customer\" \"npm run dev:ops\"",
+    "dev:api": "cd backend/api && cargo run --bin api",
+    "dev:customer": "cd frontend/customer && npm run dev",
+    "dev:ops": "cd frontend/ops && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

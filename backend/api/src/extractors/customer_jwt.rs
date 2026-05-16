@@ -1,31 +1,18 @@
 use axum::{async_trait, extract::FromRequestParts, http::request::Parts};
 use jsonwebtoken::{decode, DecodingKey, Validation};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{error::AppError, state::AppState};
+use crate::{error::AppError, extractors::ops_user::Claims, state::AppState};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: String,
-    pub email: String,
-    pub exp: usize,
-    pub role: String,
-}
-
-pub struct OpsUser {
+pub struct CustomerSession {
     pub id: Uuid,
-    pub email: String,
 }
 
 #[async_trait]
-impl FromRequestParts<AppState> for OpsUser {
+impl FromRequestParts<AppState> for CustomerSession {
     type Rejection = AppError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, AppError> {
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
         let token = parts
             .headers
             .get("Authorization")
@@ -40,15 +27,12 @@ impl FromRequestParts<AppState> for OpsUser {
         )
         .map_err(|_| AppError::Unauthorized)?;
 
-        if data.claims.role != "ops" {
+        if data.claims.role != "customer" {
             return Err(AppError::Unauthorized);
         }
 
         let id = Uuid::parse_str(&data.claims.sub).map_err(|_| AppError::Unauthorized)?;
 
-        Ok(OpsUser {
-            id,
-            email: data.claims.email,
-        })
+        Ok(CustomerSession { id })
     }
 }
