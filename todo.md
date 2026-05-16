@@ -104,26 +104,26 @@ Note: event stream is mocked — in production a queue (Kafka/SQS) sits in front
 - [x] Webhook signature verification middleware
 
 ### Backend — Customer API (`/v1`)
-- [ ] `POST /v1/events` — batch ingest, idempotency table check, insert usage_events
-- [ ] `GET /v1/usage` — cursor paginated, filter by date range + api key
-- [ ] `GET /v1/invoices` — list invoices for authenticated customer
-- [ ] `GET /v1/invoices/{id}` — invoice detail + line items
+- [x] `POST /v1/events` — batch ingest, idempotency table check, insert usage_events
+- [x] `GET /v1/usage` — cursor paginated, filter by date range + api key
+- [x] `GET /v1/invoices` — list invoices for authenticated customer
+- [x] `GET /v1/invoices/{id}` — invoice detail + line items
 
 ### Backend — Ops API (`/ops`)
-- [ ] `POST /ops/auth/login` — email + password → JWT
-- [ ] `GET /ops/customers` — list all customers
-- [ ] `GET /ops/customers/{id}` — customer detail, usage summary, invoices, anomaly flags
-- [ ] `POST /ops/customers/{id}/credits` — issue credit, write audit log
-- [ ] `PATCH /ops/invoices/{id}/line-items/{id}` — override line item, write audit log
+- [x] `POST /ops/auth/login` — email + password → JWT
+- [x] `GET /ops/customers` — list all customers
+- [x] `GET /ops/customers/{id}` — customer detail, usage summary, invoices, anomaly flags
+- [x] `POST /ops/customers/{id}/credits` — issue credit, write audit log
+- [x] `PATCH /ops/invoices/{id}/line-items/{id}` — override line item, write audit log
 
 ### Backend — Webhook
 - [ ] `POST /webhooks/payments` — verify signature, dedup delivery ID, mark invoice paid
 
 ### Background Jobs
-- [ ] Job runner — poll jobs table on interval, `SKIP LOCKED` claim, dispatch by type
-- [ ] Window job — aggregate `usage_events` into `usage_windows` by customer × hour
-- [ ] Invoice job — roll windows into line items, apply tiered pricing from price plan, create invoice, transition status draft → issued
-- [ ] Anomaly job — compute rolling 30-day averages, write `anomaly_flags` for each signal type
+- [x] Job runner — poll jobs table on interval, `SKIP LOCKED` claim, dispatch by type
+- [x] Window job — aggregate `usage_events` into `usage_windows` by customer × hour
+- [x] Invoice job — roll windows into line items, apply tiered pricing from price plan, create invoice, transition status draft → issued
+- [x] Anomaly job — compute rolling 30-day averages, write `anomaly_flags` for each signal type
 
 ### Seed / Generator Script
 - [ ] Create N customers with API keys

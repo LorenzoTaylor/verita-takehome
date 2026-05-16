@@ -1,5 +1,6 @@
 mod error;
 mod extractors;
+mod jobs;
 mod routes;
 mod state;
 
@@ -30,7 +31,9 @@ async fn main() {
         .await
         .expect("failed to run migrations");
 
-    let state = AppState { db, jwt_secret, webhook_secret };
+    let state = AppState { db: db.clone(), jwt_secret, webhook_secret };
+
+    jobs::spawn_all(db);
 
     let app = routes::router(state);
 
