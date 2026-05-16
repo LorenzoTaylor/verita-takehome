@@ -1,0 +1,36 @@
+# Claude
+.claude/
+memory/
+
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+*.pdb
+
+# Node / React / TypeScript
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+.eslintcache
+.parcel-cache/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+*.log
