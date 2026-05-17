@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import {
   AreaChart, Area, XAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, LineChart, Line,
+  type ValueType,
 } from "recharts"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/SidebarLayout"
@@ -225,7 +226,7 @@ export default function OverviewPage({ token }: { token: string }) {
                   </defs>
                   <CartesianGrid strokeDasharray="3 4" stroke="hsl(var(--verita-border))" vertical={false} />
                   <XAxis dataKey="date" interval={xInterval} tick={{ fontSize: 11, fill: "hsl(var(--verita-fg-subtle))" }} tickLine={false} axisLine={false} />
-                  <Tooltip {...TOOLTIP_PROPS} formatter={(v: number) => [`$${v}k`, "Revenue"]} />
+                  <Tooltip {...TOOLTIP_PROPS} formatter={(v: ValueType) => [`$${v}k`, "Revenue"]} />
                   <Area type="monotone" dataKey="revenue" stroke={ACCENT} strokeWidth={1.75} fill="url(#vr-rev)" animationDuration={1100} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -252,7 +253,7 @@ export default function OverviewPage({ token }: { token: string }) {
                 <BarChart data={eventsByHour} margin={{ top: 8, right: 0, left: 5, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 4" stroke="hsl(var(--verita-border))" vertical={false} />
                   <XAxis dataKey="h" tick={{ fontSize: 10.5, fill: "hsl(var(--verita-fg-subtle))" }} tickLine={false} axisLine={false} />
-                  <Tooltip {...TOOLTIP_PROPS} formatter={(v: number) => [v.toLocaleString(), "Events"]} />
+                  <Tooltip {...TOOLTIP_PROPS} formatter={(v: ValueType) => [Number(v).toLocaleString(), "Events"]} />
                   <Bar dataKey="events" fill={ACCENT} radius={[3, 3, 0, 0]} animationDuration={800} />
                 </BarChart>
               </ResponsiveContainer>
