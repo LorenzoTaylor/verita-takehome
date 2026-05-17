@@ -77,9 +77,85 @@ export async function patchLineItem(
 }
 
 export function formatMoney(minor: number): string {
-  return `$${(minor / 1000).toFixed(2)}`
+  return `$${(minor / 1000).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function formatPeriod(start: string, end: string): string {
   return `${new Date(start).toLocaleDateString()} – ${new Date(end).toLocaleDateString()}`
+}
+
+export type UsageDay = { date: string; units: number }
+
+export async function fetchCustomerUsage(token: string, id: string): Promise<UsageDay[]> {
+  return apiFetch(`/ops/customers/${id}/usage`, token)
+}
+
+export type OverviewStats = {
+  total_customers: number
+  prev_customers: number
+  total_revenue_minor: number
+  prev_revenue_minor: number
+  open_invoices: number
+  active_anomalies: number
+  prev_active_anomalies: number
+}
+
+export type RevenueDay = { date: string; revenue_minor: number }
+
+export async function fetchRevenueChart(token: string, days = 90): Promise<RevenueDay[]> {
+  return apiFetch(`/ops/revenue-chart?days=${days}`, token)
+}
+
+export type InvoiceListItem = {
+  id: string
+  customer_id: string
+  customer_name: string
+  period_start: string
+  period_end: string
+  status: "draft" | "issued" | "paid"
+  total_minor: number
+  created_at: string
+}
+
+export type CreditListItem = {
+  id: string
+  customer_id: string
+  customer_name: string
+  amount_minor: number
+  reason: string
+  created_at: string
+}
+
+export type AnomalyListItem = {
+  id: string
+  customer_id: string
+  customer_name: string
+  signal_type: string
+  value: number | null
+  threshold: number | null
+  flagged_at: string
+  resolved_at: string | null
+}
+
+export async function fetchOverview(token: string, days?: number): Promise<OverviewStats> {
+  const qs = days ? `?days=${days}` : ""
+  return apiFetch(`/ops/overview${qs}`, token)
+}
+
+export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]> {
+  return apiFetch("/ops/invoices", token)
+}
+
+export async function fetchAllCredits(token: string): Promise<CreditListItem[]> {
+  return apiFetch("/ops/credits", token)
+}
+
+export async function fetchAnomalies(token: string): Promise<AnomalyListItem[]> {
+  return apiFetch("/ops/anomalies", token)
+}
+
+export type EventsHour = { h: string; events: number }
+
+export async function fetchEventsByHour(token: string): Promise<EventsHour[]> {
+  return apiFetch("/ops/events-by-hour", token)
 }

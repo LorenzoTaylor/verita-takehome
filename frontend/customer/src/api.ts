@@ -28,7 +28,19 @@ export type LineItem = {
 
 export type InvoiceDetail = Invoice & { line_items: LineItem[] }
 
+export type Me = { name: string; email: string }
+
 export type PagedUsage = { data: UsageEvent[]; next_cursor: string | null }
+
+export type DailyUsage = { date: string; units: number; events: number; late_events: number }
+
+export type UsageStats = {
+  total_units: number
+  event_count: number
+  late_count: number
+  endpoints_used: number
+  daily: DailyUsage[]
+}
 
 export type UsageFilters = {
   cursor?: string
@@ -62,6 +74,10 @@ export async function login(email: string, password: string): Promise<string> {
   return data.token
 }
 
+export async function fetchMe(token: string): Promise<Me> {
+  return apiFetch("/v1/me", token)
+}
+
 export async function fetchUsage(token: string, filters: UsageFilters = {}): Promise<PagedUsage> {
   const params = new URLSearchParams()
   if (filters.cursor) params.set("cursor", filters.cursor)
@@ -73,6 +89,14 @@ export async function fetchUsage(token: string, filters: UsageFilters = {}): Pro
   return apiFetch(`/v1/usage${qs ? `?${qs}` : ""}`, token)
 }
 
+export async function fetchUsageStats(token: string, filters: { from?: string; to?: string } = {}): Promise<UsageStats> {
+  const params = new URLSearchParams()
+  if (filters.from) params.set("from", filters.from)
+  if (filters.to) params.set("to", filters.to)
+  const qs = params.toString()
+  return apiFetch(`/v1/usage/stats${qs ? `?${qs}` : ""}`, token)
+}
+
 export async function fetchInvoices(token: string): Promise<Invoice[]> {
   return apiFetch("/v1/invoices", token)
 }
@@ -82,7 +106,7 @@ export async function fetchInvoice(token: string, id: string): Promise<InvoiceDe
 }
 
 export function formatMoney(minor: number): string {
-  return `$${(minor / 1000).toFixed(2)}`
+  return `$${(minor / 1000).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function formatPeriod(start: string, end: string): string {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
+import PageLayout from "@/components/PageLayout"
 import { fetchInvoices, formatMoney, formatPeriod, type Invoice } from "@/api"
 
 const statusVariant: Record<Invoice["status"], "secondary" | "info" | "success"> = {
@@ -22,45 +23,48 @@ export default function InvoicesPage({ token }: { token: string }) {
   }, [token])
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Invoices</h1>
-      {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
-      {error && <p className="text-destructive text-sm">{error}</p>}
-      {!loading && !error && (
-        <div className="rounded-md border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Period</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Amount</th>
-                <th className="px-4 py-3"></th>
+    <PageLayout title="Invoices">
+      <div className="bg-white rounded-xl border border-[hsl(var(--verita-border))] shadow-sm overflow-hidden">
+        {loading && (
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">Loading…</div>
+        )}
+        {error && (
+          <div className="px-5 py-10 text-center text-sm text-destructive">{error}</div>
+        )}
+        {!loading && !error && invoices.length === 0 && (
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">No invoices yet.</div>
+        )}
+        {!loading && !error && invoices.length > 0 && (
+          <table className="w-full text-[13.5px]">
+            <thead>
+              <tr className="bg-[hsl(60_8%_97%)] border-b border-[hsl(var(--verita-border))]">
+                <th className="text-left px-5 py-2.5 text-xs font-medium text-muted-foreground">Invoice</th>
+                <th className="text-left px-5 py-2.5 text-xs font-medium text-muted-foreground">Period</th>
+                <th className="text-left px-5 py-2.5 text-xs font-medium text-muted-foreground">Status</th>
+                <th className="text-right px-5 py-2.5 text-xs font-medium text-muted-foreground">Amount</th>
+                <th className="px-5 py-2.5"></th>
               </tr>
             </thead>
             <tbody>
-              {invoices.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No invoices yet.</td></tr>
-              )}
               {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3">{formatPeriod(inv.period_start, inv.period_end)}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={statusVariant[inv.status]}>{inv.status}</Badge>
+                <tr key={inv.id} className="border-b last:border-0 border-[hsl(var(--verita-border))]">
+                  <td className="px-5 py-3 font-mono-numeric text-xs font-medium">#{inv.id.slice(0, 8)}</td>
+                  <td className="px-5 py-3 text-[12.5px] text-muted-foreground">{formatPeriod(inv.period_start, inv.period_end)}</td>
+                  <td className="px-5 py-3">
+                    <Badge variant={statusVariant[inv.status]}>
+                      <span className="w-1 h-1 rounded-full bg-current mr-1" />{inv.status}
+                    </Badge>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums font-medium">
-                    {formatMoney(inv.total_minor)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link to={`/invoices/${inv.id}`} className="text-primary text-xs underline-offset-4 hover:underline">
-                      View
-                    </Link>
+                  <td className="px-5 py-3 text-right font-mono-numeric font-medium">{formatMoney(inv.total_minor)}</td>
+                  <td className="px-5 py-3 text-right">
+                    <Link to={`/invoices/${inv.id}`} className="text-primary text-[12.5px] font-medium hover:underline">View</Link>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </PageLayout>
   )
 }
