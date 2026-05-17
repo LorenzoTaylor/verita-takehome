@@ -35,7 +35,7 @@ Four scenarios that had to be safe:
 
 **Event ingestion replay.** `POST /v1/events` runs `INSERT INTO processed_events (request_id) ON CONFLICT DO NOTHING` before touching `usage_events`. If the request_id is already present, the event is skipped and the response returns 200. The two-table design means the dedup gate is a single keyed write with no read-then-check race. Concurrent ingestion of the same request_id races to `processed_events`; only one wins.
 
-**Aggregator running twice.** The window job acquires a row lock on `jobs WHERE job_type = 'window'` using `SELECT FOR UPDATE SKIP LOCKED`. A second instance finds zero rows and exits immediately, no blocking. The actual window update uses `INSERT ... ON CONFLICT (customer_id, window_start) DO UPDATE SET units_total = usage_windows.units_total + EXCLUDED.units_total`, which is additive and safe to replay as long as the source events haven't changed.
+**Aggregator running twice.** The window job acquires a row lock on `jobs WHERE job_type = 'window'` using `SELECT FOR UPDATE SKIP LOCKED`. A second instance finds zero rows and exits immediately, no blocking. The actual window update uses `INSERT ... ON CONFLICT (customer_id, window_start) DO UPDATE SET units_total = EXCLUDED.units_total`, which overwrites with the freshly computed total — safe to replay any number of times because the result is always derived from the complete set of source events for that hour.
 
 **Webhook delivered three times.** `POST /webhooks/payments` runs `INSERT INTO webhook_deliveries (delivery_id) ON CONFLICT DO NOTHING`. If the delivery ID is already present, the handler returns 200 with no side effects. Signature verification runs before the dedup check, so unsigned requests never reach it.
 
@@ -45,7 +45,7 @@ Four scenarios that had to be safe:
 
 ## 3. Aggregation pipeline
 
-The window job runs hourly. It queries `usage_events WHERE timestamp >= last_run_at` (tracked in `jobs.last_run_at`), groups by `(customer_id, date_trunc('hour', timestamp))`, and upserts into `usage_windows`. Windows are recomputable from raw events — if a window is wrong, rerunning the job from a corrected `last_run_at` fixes it.
+The window job runs hourly. It does a full recompute: `SELECT customer_id, date_trunc('hour', timestamp), SUM(units) FROM usage_events WHERE status = 'normal' GROUP BY ...` and upserts the result into `usage_windows` with `ON CONFLICT DO UPDATE SET units_total = EXCLUDED.units_total`. This is intentionally a full scan rather than an incremental `WHERE timestamp >= last_run_at` approach. The trade-off: each run is slower (full table scan), but the result is always correct — late events, retries, and corrections are automatically captured on the next run with no bookkeeping. At current scale this is fine; at 500M events/month the fix is partitioning, not incrementalism (see section 4).
 
 The invoice job runs monthly. It reads `usage_windows` for the billing period, applies tiered pricing from `price_plans` (tiers stored as JSONB, plan pinned at period start), and writes `invoice_line_items` and an `invoice` row. Invoices start as `draft` until explicitly issued.
 
@@ -53,13 +53,13 @@ Windows are recomputable. Invoices in `issued` or `paid` state are not — the i
 
 Late-arriving events are written with `status = 'late'` and excluded from the current window. The delta posts as a credit line item on the next open invoice. Closed invoices are never reopened. Customers see a credit on their next bill with a clear reason, and the historical record stays intact.
 
-To check for drift between raw events and window totals: `SUM(units) FROM usage_events WHERE customer_id = $1 AND timestamp BETWEEN $start AND $end` vs `SUM(units_total) FROM usage_windows` for the same range. A gap means late events or a partial job run. The window job handles partial runs by processing from `last_run_at`; late events go through the credit path above.
+To check for drift between raw events and window totals: `SUM(units) FROM usage_events WHERE customer_id = $1 AND timestamp BETWEEN $start AND $end` vs `SUM(units_total) FROM usage_windows` for the same range. A gap means late events (`status = 'late'` are excluded from windows) or a job that hasn't run yet. The full-recompute approach means rerunning the job is always safe and self-correcting.
 
 ---
 
 ## 4. Failure modes
 
-**Aggregation job performance.** At 500M events/month, the hourly window job scans millions of rows per run. A naive `WHERE timestamp >= last_run_at` becomes a sequential scan across a table that never stops growing. Partition `usage_events` by month. The job queries only the current month's partition and, combined with the `(customer_id, timestamp)` index, each run only touches the delta since last execution.
+**Aggregation job performance.** The window job does a full table scan every hour — `SUM(units) GROUP BY customer_id, hour` across all of `usage_events`. At 500M events/month that table has roughly 16M rows per day, and the job runs 1,440 times daily. The fix is partitioning `usage_events` by month. Each run then scans only the current month's partition, which is bounded and shrinks relative to the total table. The `(customer_id, timestamp)` index handles the per-customer grouping within that partition. Incrementalism (tracking `last_run_at`) is an alternative but introduces drift risk when events arrive late or jobs crash mid-run; partitioning solves the performance problem while keeping the full-recompute correctness guarantee.
 
 **Idempotency table write contention.** At 2,000 events/sec peak, `INSERT INTO processed_events` is a single-table write bottleneck. `ON CONFLICT` at that rate creates hot blocks and lock contention. The fix is Redis `SETNX` with a TTL long enough to cover the replay window (48 hours covers most delivery retries), keeping `processed_events` as an async audit trail. This decouples the fast path from Postgres.
 
@@ -75,7 +75,7 @@ The obvious attack is guessing another customer's UUID and reading their invoice
 
 Tenant scoping is enforced at the extractor level, not in individual handlers. The `CustomerSession` extractor resolves the API key to a `customer_id` and attaches it to the request. Every query binds `customer_id = $1` from the extractor. There's no handler that fetches by ID alone. A valid UUID belonging to a different customer returns 404, the same as a wrong UUID.
 
-API keys are generated as `vk_<32 random bytes base64>`. A 12-character prefix is stored in plaintext to narrow the Argon2 verification to one row; the rest is hashed with Argon2id. The secret is shown once at creation and never again. A DB dump leaks prefixes, not secrets.
+API keys are generated as `sk_<32 random bytes base64>`. An 8-character prefix is stored in plaintext to narrow the Argon2 verification to one row; the rest is hashed with Argon2id. The secret is shown once at creation and never again. A DB dump leaks prefixes, not secrets.
 
 **Hostile internal user**
 

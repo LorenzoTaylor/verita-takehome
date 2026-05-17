@@ -43,7 +43,8 @@ export async function login(email: string, password: string): Promise<string> {
 }
 
 export async function fetchCustomers(token: string): Promise<Customer[]> {
-  return apiFetch("/ops/customers", token)
+  const res = await apiFetch<{ data: Customer[]; next_cursor: string | null }>("/ops/customers", token)
+  return res.data
 }
 
 export async function fetchCustomer(token: string, id: string): Promise<CustomerDetail> {
@@ -143,15 +144,18 @@ export async function fetchOverview(token: string, days?: number): Promise<Overv
 }
 
 export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]> {
-  return apiFetch("/ops/invoices", token)
+  const res = await apiFetch<{ data: InvoiceListItem[]; next_cursor: string | null }>("/ops/invoices", token)
+  return res.data
 }
 
 export async function fetchAllCredits(token: string): Promise<CreditListItem[]> {
-  return apiFetch("/ops/credits", token)
+  const res = await apiFetch<{ data: CreditListItem[]; next_cursor: string | null }>("/ops/credits", token)
+  return res.data
 }
 
 export async function fetchAnomalies(token: string): Promise<AnomalyListItem[]> {
-  return apiFetch("/ops/anomalies", token)
+  const res = await apiFetch<{ data: AnomalyListItem[]; next_cursor: string | null }>("/ops/anomalies", token)
+  return res.data
 }
 
 export type EventsHour = { h: string; events: number }
