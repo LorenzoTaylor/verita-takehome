@@ -1,6 +1,6 @@
-[Design doc](DESIGN.md)
+[Design doc](DESIGN.md) · [Video walkthrough](https://loom.com/TODO) 
 
-**Extras:** [Live demo](https://verita.lore.dev) · [Video walkthrough](https://loom.com/TODO) · [Decision log](decision.md)
+**Extras:** [Live demo](https://verita.lore.dev) · [Decision log](decision.md)
 
 ---
 
