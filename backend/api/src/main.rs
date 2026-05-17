@@ -1,11 +1,5 @@
-mod error;
-mod extractors;
-mod jobs;
-mod routes;
-mod state;
-
+use api::{jobs, routes, state::AppState};
 use sqlx::postgres::PgPoolOptions;
-use state::AppState;
 
 #[tokio::main]
 async fn main() {

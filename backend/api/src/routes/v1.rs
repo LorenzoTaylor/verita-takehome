@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -23,10 +23,14 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/auth/login", post(post_login))
+        .route("/me", get(get_me))
         .route("/events", post(post_events))
         .route("/usage", get(get_usage))
+        .route("/usage/stats", get(get_usage_stats))
         .route("/invoices", get(get_invoices))
         .route("/invoices/:id", get(get_invoice))
+        .route("/api-keys", get(list_api_keys).post(create_api_key))
+        .route("/api-keys/:id", delete(revoke_api_key))
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -91,6 +95,29 @@ async fn post_login(
     .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     Ok(Json(LoginResponse { token }))
+}
+
+// ── Me ───────────────────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct MeResponse {
+    name: String,
+    email: String,
+}
+
+async fn get_me(
+    customer: CustomerSession,
+    State(state): State<AppState>,
+) -> Result<Json<MeResponse>> {
+    #[derive(sqlx::FromRow)]
+    struct Row { name: String, email: String }
+    let row = sqlx::query_as::<_, Row>(
+        "SELECT name, email FROM customers WHERE id = $1",
+    )
+    .bind(customer.id)
+    .fetch_one(&state.db)
+    .await?;
+    Ok(Json(MeResponse { name: row.name, email: row.email }))
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
@@ -285,6 +312,106 @@ pub async fn get_usage(
     Ok(Json(PagedResponse { data: rows, next_cursor }))
 }
 
+// ── Usage Stats (aggregated) ─────────────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct DailyUsage {
+    pub date: String,
+    pub units: i64,
+    pub events: i64,
+    pub late_events: i64,
+}
+
+#[derive(Serialize)]
+pub struct UsageStats {
+    pub total_units: i64,
+    pub event_count: i64,
+    pub late_count: i64,
+    pub endpoints_used: i64,
+    pub daily: Vec<DailyUsage>,
+}
+
+#[derive(Deserialize)]
+pub struct StatsQuery {
+    pub from: Option<DateTime<Utc>>,
+    pub to: Option<DateTime<Utc>>,
+}
+
+pub async fn get_usage_stats(
+    customer: CustomerSession,
+    State(state): State<AppState>,
+    Query(params): Query<StatsQuery>,
+) -> Result<Json<UsageStats>> {
+    #[derive(sqlx::FromRow)]
+    struct TotalsRow {
+        total_units: i64,
+        event_count: i64,
+        late_count: i64,
+        endpoints_used: i64,
+    }
+
+    let totals = sqlx::query_as::<_, TotalsRow>(
+        "SELECT
+            COALESCE(SUM(units), 0)::bigint AS total_units,
+            COUNT(*)::bigint AS event_count,
+            COUNT(*) FILTER (WHERE status = 'late')::bigint AS late_count,
+            COUNT(DISTINCT endpoint)::bigint AS endpoints_used
+         FROM usage_events
+         WHERE customer_id = $1
+           AND ($2::timestamptz IS NULL OR timestamp >= $2)
+           AND ($3::timestamptz IS NULL OR timestamp <= $3)",
+    )
+    .bind(customer.id)
+    .bind(params.from)
+    .bind(params.to)
+    .fetch_one(&state.db)
+    .await?;
+
+    #[derive(sqlx::FromRow)]
+    struct DailyRow {
+        date: chrono::NaiveDate,
+        units: i64,
+        events: i64,
+        late_events: i64,
+    }
+
+    let daily_rows = sqlx::query_as::<_, DailyRow>(
+        "SELECT DATE(timestamp AT TIME ZONE 'UTC') AS date,
+                SUM(units)::bigint AS units,
+                COUNT(*)::bigint AS events,
+                COUNT(*) FILTER (WHERE status = 'late')::bigint AS late_events
+         FROM usage_events
+         WHERE customer_id = $1
+           AND ($2::timestamptz IS NULL OR timestamp >= $2)
+           AND ($3::timestamptz IS NULL OR timestamp <= $3)
+         GROUP BY DATE(timestamp AT TIME ZONE 'UTC')
+         ORDER BY date",
+    )
+    .bind(customer.id)
+    .bind(params.from)
+    .bind(params.to)
+    .fetch_all(&state.db)
+    .await?;
+
+    let daily = daily_rows
+        .into_iter()
+        .map(|r| DailyUsage {
+            date: r.date.to_string(),
+            units: r.units,
+            events: r.events,
+            late_events: r.late_events,
+        })
+        .collect();
+
+    Ok(Json(UsageStats {
+        total_units: totals.total_units,
+        event_count: totals.event_count,
+        late_count: totals.late_count,
+        endpoints_used: totals.endpoints_used,
+        daily,
+    }))
+}
+
 // ── Invoices ──────────────────────────────────────────────────────────────────
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -359,4 +486,109 @@ pub async fn get_invoice(
     .await?;
 
     Ok(Json(InvoiceDetail { invoice, line_items }))
+}
+
+// ── API keys ──────────────────────────────────────────────────────────────────
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ApiKeyRow {
+    id: Uuid,
+    name: String,
+    prefix: String,
+    created_at: DateTime<Utc>,
+    revoked_at: Option<DateTime<Utc>>,
+}
+
+async fn list_api_keys(
+    customer: CustomerSession,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ApiKeyRow>>> {
+    let rows = sqlx::query_as::<_, ApiKeyRow>(
+        "SELECT id, name, prefix, created_at, revoked_at
+         FROM api_keys WHERE customer_id = $1
+         ORDER BY created_at DESC",
+    )
+    .bind(customer.id)
+    .fetch_all(&state.db)
+    .await?;
+    Ok(Json(rows))
+}
+
+#[derive(Deserialize)]
+struct CreateKeyBody {
+    name: String,
+}
+
+#[derive(Serialize)]
+struct CreatedKey {
+    id: Uuid,
+    name: String,
+    prefix: String,
+    secret: String,
+    created_at: DateTime<Utc>,
+}
+
+async fn create_api_key(
+    customer: CustomerSession,
+    State(state): State<AppState>,
+    Json(body): Json<CreateKeyBody>,
+) -> Result<Json<CreatedKey>> {
+    use argon2::{
+        password_hash::{rand_core::OsRng, SaltString},
+        Argon2, PasswordHasher,
+    };
+
+    let raw_bytes: [u8; 32] = rand::random();
+    let secret = format!("sk_{}", URL_SAFE_NO_PAD.encode(raw_bytes));
+    let prefix = secret.chars().take(12).collect::<String>();
+
+    let hash = tokio::task::spawn_blocking({
+        let secret = secret.clone();
+        move || {
+            let salt = SaltString::generate(&mut OsRng);
+            Argon2::default()
+                .hash_password(secret.as_bytes(), &salt)
+                .map(|h| h.to_string())
+                .map_err(|e| anyhow::anyhow!("{e}"))
+        }
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("{e}"))??;
+
+    let id = Uuid::new_v4();
+    let now = Utc::now();
+    sqlx::query(
+        "INSERT INTO api_keys (id, customer_id, name, prefix, key_hash, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(id)
+    .bind(customer.id)
+    .bind(&body.name)
+    .bind(&prefix)
+    .bind(&hash)
+    .bind(now)
+    .execute(&state.db)
+    .await?;
+
+    Ok(Json(CreatedKey { id, name: body.name, prefix, secret, created_at: now }))
+}
+
+async fn revoke_api_key(
+    customer: CustomerSession,
+    State(state): State<AppState>,
+    Path(key_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>> {
+    let result = sqlx::query(
+        "UPDATE api_keys SET revoked_at = now()
+         WHERE id = $1 AND customer_id = $2 AND revoked_at IS NULL",
+    )
+    .bind(key_id)
+    .bind(customer.id)
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(Json(serde_json::json!({ "revoked": true })))
 }

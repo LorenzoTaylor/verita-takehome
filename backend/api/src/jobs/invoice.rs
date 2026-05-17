@@ -167,3 +167,37 @@ pub async fn run(db: &PgPool) -> anyhow::Result<()> {
     );
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tiers(specs: &[(Option<i64>, i64)]) -> Vec<PriceTier> {
+        specs
+            .iter()
+            .map(|(up_to, price)| PriceTier { up_to: *up_to, unit_price_minor: *price })
+            .collect()
+    }
+
+    #[test]
+    fn apply_tiers_tiered_pricing() {
+        let t = tiers(&[(Some(10_000), 0), (None, 1)]);
+        let items = apply_tiers(15_000, &t);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items.iter().map(|i| i.total_minor).sum::<i64>(), 5_000);
+    }
+
+    #[test]
+    fn apply_tiers_zero_units() {
+        let t = tiers(&[(Some(10_000), 0), (None, 1)]);
+        assert!(apply_tiers(0, &t).is_empty());
+    }
+
+    #[test]
+    fn apply_tiers_all_free() {
+        let t = tiers(&[(Some(10_000), 0)]);
+        let items = apply_tiers(5_000, &t);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].total_minor, 0);
+    }
+}

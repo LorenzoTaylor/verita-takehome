@@ -3,6 +3,10 @@ name = "api"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "api"
+path = "src/lib.rs"
+
 [[bin]]
 name = "seed"
 path = "src/bin/seed.rs"
@@ -20,7 +24,7 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 argon2 = "0.5"
 jsonwebtoken = "9"
-tower = "0.4"
+tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 anyhow = "1"
 thiserror = "1"
