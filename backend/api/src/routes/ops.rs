@@ -3,7 +3,8 @@ use axum::{
     routing::{get, patch, post},
     Json, Router,
 };
-use chrono::{Duration, Utc};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use chrono::{DateTime, Duration, Utc};
 use std::collections::HashMap;
 use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
@@ -34,6 +35,33 @@ pub fn router() -> Router<AppState> {
         )
         .route("/credits", get(get_all_credits))
         .route("/anomalies", get(get_anomalies))
+}
+
+// ── Cursor pagination helpers ─────────────────────────────────────────────────
+
+fn encode_cursor(ts: DateTime<Utc>, id: Uuid) -> String {
+    URL_SAFE_NO_PAD.encode(format!("{},{}", ts.to_rfc3339(), id))
+}
+
+fn decode_cursor(s: &str) -> Option<(DateTime<Utc>, Uuid)> {
+    let bytes = URL_SAFE_NO_PAD.decode(s).ok()?;
+    let decoded = String::from_utf8(bytes).ok()?;
+    let (ts_str, id_str) = decoded.split_once(',')?;
+    let ts = DateTime::parse_from_rfc3339(ts_str).ok()?.with_timezone(&Utc);
+    let id = Uuid::parse_str(id_str).ok()?;
+    Some((ts, id))
+}
+
+#[derive(Deserialize)]
+struct OpsPageParams {
+    cursor: Option<String>,
+    limit: Option<i64>,
+}
+
+#[derive(Serialize)]
+struct Paginated<T: Serialize> {
+    data: Vec<T>,
+    next_cursor: Option<String>,
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
@@ -108,14 +136,40 @@ struct CustomerRow {
 async fn get_customers(
     _ops: OpsUser,
     State(state): State<AppState>,
-) -> Result<Json<Vec<CustomerRow>>> {
-    let rows = sqlx::query_as::<_, CustomerRow>(
-        "SELECT id, name, email, created_at FROM customers ORDER BY created_at DESC",
-    )
-    .fetch_all(&state.db)
-    .await?;
+    Query(params): Query<OpsPageParams>,
+) -> Result<Json<Paginated<CustomerRow>>> {
+    let limit = params.limit.unwrap_or(100).min(500);
 
-    Ok(Json(rows))
+    let rows = if let Some(ref c) = params.cursor {
+        let (cursor_ts, cursor_id) =
+            decode_cursor(c).ok_or_else(|| AppError::BadRequest("invalid cursor".into()))?;
+        sqlx::query_as::<_, CustomerRow>(
+            "SELECT id, name, email, created_at FROM customers
+             WHERE (created_at < $1 OR (created_at = $1 AND id < $2))
+             ORDER BY created_at DESC, id DESC LIMIT $3",
+        )
+        .bind(cursor_ts)
+        .bind(cursor_id)
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    } else {
+        sqlx::query_as::<_, CustomerRow>(
+            "SELECT id, name, email, created_at FROM customers
+             ORDER BY created_at DESC, id DESC LIMIT $1",
+        )
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    };
+
+    let next_cursor = if rows.len() == limit as usize {
+        rows.last().map(|r| encode_cursor(r.created_at, r.id))
+    } else {
+        None
+    };
+
+    Ok(Json(Paginated { data: rows, next_cursor }))
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -204,21 +258,14 @@ async fn post_credit(
         return Err(AppError::NotFound);
     }
 
-    // Return the existing credit for this idempotency key if already issued
-    if let Some(row) = sqlx::query_as::<_, CreditRow>(
-        "SELECT id, amount_minor, reason, created_at FROM credits WHERE idempotency_key = $1",
-    )
-    .bind(&body.idempotency_key)
-    .fetch_optional(&state.db)
-    .await?
-    {
-        return Ok(Json(row));
-    }
-
     let credit_id = Uuid::new_v4();
-    sqlx::query(
+
+    // RETURNING returns a row only on fresh insert; ON CONFLICT DO NOTHING returns nothing on replay.
+    let inserted = sqlx::query_as::<_, CreditRow>(
         "INSERT INTO credits (id, customer_id, amount_minor, reason, created_by, idempotency_key)
-         VALUES ($1, $2, $3, $4, $5, $6)",
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (idempotency_key) DO NOTHING
+         RETURNING id, amount_minor, reason, created_at",
     )
     .bind(credit_id)
     .bind(customer_id)
@@ -226,30 +273,32 @@ async fn post_credit(
     .bind(&body.reason)
     .bind(ops.id)
     .bind(&body.idempotency_key)
-    .execute(&state.db)
+    .fetch_optional(&state.db)
     .await?;
 
-    sqlx::query(
-        "INSERT INTO audit_log
-             (actor_id, actor_email, action, entity_type, entity_id, after_val, reason)
-         VALUES ($1, $2, 'credit_issued', 'credit', $3, $4, $5)",
-    )
-    .bind(ops.id)
-    .bind(&ops.email)
-    .bind(credit_id)
-    .bind(json!({ "amount_minor": body.amount_minor, "customer_id": customer_id }))
-    .bind(&body.reason)
-    .execute(&state.db)
-    .await?;
-
-    let row = sqlx::query_as::<_, CreditRow>(
-        "SELECT id, amount_minor, reason, created_at FROM credits WHERE id = $1",
-    )
-    .bind(credit_id)
-    .fetch_one(&state.db)
-    .await?;
-
-    Ok(Json(row))
+    if let Some(row) = inserted {
+        sqlx::query(
+            "INSERT INTO audit_log
+                 (actor_id, actor_email, action, entity_type, entity_id, after_val, reason)
+             VALUES ($1, $2, 'credit_issued', 'credit', $3, $4, $5)",
+        )
+        .bind(ops.id)
+        .bind(&ops.email)
+        .bind(row.id)
+        .bind(json!({ "amount_minor": body.amount_minor, "customer_id": customer_id }))
+        .bind(&body.reason)
+        .execute(&state.db)
+        .await?;
+        Ok(Json(row))
+    } else {
+        let row = sqlx::query_as::<_, CreditRow>(
+            "SELECT id, amount_minor, reason, created_at FROM credits WHERE idempotency_key = $1",
+        )
+        .bind(&body.idempotency_key)
+        .fetch_one(&state.db)
+        .await?;
+        Ok(Json(row))
+    }
 }
 
 // ── Customer usage ────────────────────────────────────────────────────────────
@@ -590,16 +639,44 @@ struct InvoiceListRow {
 async fn get_all_invoices(
     _ops: OpsUser,
     State(state): State<AppState>,
-) -> Result<Json<Vec<InvoiceListRow>>> {
-    let rows = sqlx::query_as::<_, InvoiceListRow>(
-        "SELECT i.id, i.customer_id, c.name AS customer_name,
-                i.period_start, i.period_end, i.status, i.total_minor, i.created_at
-         FROM invoices i JOIN customers c ON c.id = i.customer_id
-         ORDER BY i.created_at DESC LIMIT 500",
-    )
-    .fetch_all(&state.db)
-    .await?;
-    Ok(Json(rows))
+    Query(params): Query<OpsPageParams>,
+) -> Result<Json<Paginated<InvoiceListRow>>> {
+    let limit = params.limit.unwrap_or(100).min(500);
+
+    let rows = if let Some(ref c) = params.cursor {
+        let (cursor_ts, cursor_id) =
+            decode_cursor(c).ok_or_else(|| AppError::BadRequest("invalid cursor".into()))?;
+        sqlx::query_as::<_, InvoiceListRow>(
+            "SELECT i.id, i.customer_id, c.name AS customer_name,
+                    i.period_start, i.period_end, i.status, i.total_minor, i.created_at
+             FROM invoices i JOIN customers c ON c.id = i.customer_id
+             WHERE (i.created_at < $1 OR (i.created_at = $1 AND i.id < $2))
+             ORDER BY i.created_at DESC, i.id DESC LIMIT $3",
+        )
+        .bind(cursor_ts)
+        .bind(cursor_id)
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    } else {
+        sqlx::query_as::<_, InvoiceListRow>(
+            "SELECT i.id, i.customer_id, c.name AS customer_name,
+                    i.period_start, i.period_end, i.status, i.total_minor, i.created_at
+             FROM invoices i JOIN customers c ON c.id = i.customer_id
+             ORDER BY i.created_at DESC, i.id DESC LIMIT $1",
+        )
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    };
+
+    let next_cursor = if rows.len() == limit as usize {
+        rows.last().map(|r| encode_cursor(r.created_at, r.id))
+    } else {
+        None
+    };
+
+    Ok(Json(Paginated { data: rows, next_cursor }))
 }
 
 // ── All credits ───────────────────────────────────────────────────────────────
@@ -617,16 +694,44 @@ struct CreditListRow {
 async fn get_all_credits(
     _ops: OpsUser,
     State(state): State<AppState>,
-) -> Result<Json<Vec<CreditListRow>>> {
-    let rows = sqlx::query_as::<_, CreditListRow>(
-        "SELECT cr.id, cr.customer_id, c.name AS customer_name,
-                cr.amount_minor, cr.reason, cr.created_at
-         FROM credits cr JOIN customers c ON c.id = cr.customer_id
-         ORDER BY cr.created_at DESC LIMIT 500",
-    )
-    .fetch_all(&state.db)
-    .await?;
-    Ok(Json(rows))
+    Query(params): Query<OpsPageParams>,
+) -> Result<Json<Paginated<CreditListRow>>> {
+    let limit = params.limit.unwrap_or(100).min(500);
+
+    let rows = if let Some(ref c) = params.cursor {
+        let (cursor_ts, cursor_id) =
+            decode_cursor(c).ok_or_else(|| AppError::BadRequest("invalid cursor".into()))?;
+        sqlx::query_as::<_, CreditListRow>(
+            "SELECT cr.id, cr.customer_id, c.name AS customer_name,
+                    cr.amount_minor, cr.reason, cr.created_at
+             FROM credits cr JOIN customers c ON c.id = cr.customer_id
+             WHERE (cr.created_at < $1 OR (cr.created_at = $1 AND cr.id < $2))
+             ORDER BY cr.created_at DESC, cr.id DESC LIMIT $3",
+        )
+        .bind(cursor_ts)
+        .bind(cursor_id)
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    } else {
+        sqlx::query_as::<_, CreditListRow>(
+            "SELECT cr.id, cr.customer_id, c.name AS customer_name,
+                    cr.amount_minor, cr.reason, cr.created_at
+             FROM credits cr JOIN customers c ON c.id = cr.customer_id
+             ORDER BY cr.created_at DESC, cr.id DESC LIMIT $1",
+        )
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    };
+
+    let next_cursor = if rows.len() == limit as usize {
+        rows.last().map(|r| encode_cursor(r.created_at, r.id))
+    } else {
+        None
+    };
+
+    Ok(Json(Paginated { data: rows, next_cursor }))
 }
 
 // ── Anomalies ─────────────────────────────────────────────────────────────────
@@ -646,15 +751,44 @@ struct AnomalyListRow {
 async fn get_anomalies(
     _ops: OpsUser,
     State(state): State<AppState>,
-) -> Result<Json<Vec<AnomalyListRow>>> {
-    let rows = sqlx::query_as::<_, AnomalyListRow>(
-        "SELECT af.id, af.customer_id, c.name AS customer_name,
-                af.signal_type, af.value::float8, af.threshold::float8,
-                af.flagged_at, af.resolved_at
-         FROM anomaly_flags af JOIN customers c ON c.id = af.customer_id
-         ORDER BY af.flagged_at DESC LIMIT 500",
-    )
-    .fetch_all(&state.db)
-    .await?;
-    Ok(Json(rows))
+    Query(params): Query<OpsPageParams>,
+) -> Result<Json<Paginated<AnomalyListRow>>> {
+    let limit = params.limit.unwrap_or(100).min(500);
+
+    let rows = if let Some(ref c) = params.cursor {
+        let (cursor_ts, cursor_id) =
+            decode_cursor(c).ok_or_else(|| AppError::BadRequest("invalid cursor".into()))?;
+        sqlx::query_as::<_, AnomalyListRow>(
+            "SELECT af.id, af.customer_id, c.name AS customer_name,
+                    af.signal_type, af.value::float8, af.threshold::float8,
+                    af.flagged_at, af.resolved_at
+             FROM anomaly_flags af JOIN customers c ON c.id = af.customer_id
+             WHERE (af.flagged_at < $1 OR (af.flagged_at = $1 AND af.id < $2))
+             ORDER BY af.flagged_at DESC, af.id DESC LIMIT $3",
+        )
+        .bind(cursor_ts)
+        .bind(cursor_id)
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    } else {
+        sqlx::query_as::<_, AnomalyListRow>(
+            "SELECT af.id, af.customer_id, c.name AS customer_name,
+                    af.signal_type, af.value::float8, af.threshold::float8,
+                    af.flagged_at, af.resolved_at
+             FROM anomaly_flags af JOIN customers c ON c.id = af.customer_id
+             ORDER BY af.flagged_at DESC, af.id DESC LIMIT $1",
+        )
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    };
+
+    let next_cursor = if rows.len() == limit as usize {
+        rows.last().map(|r| encode_cursor(r.flagged_at, r.id))
+    } else {
+        None
+    };
+
+    Ok(Json(Paginated { data: rows, next_cursor }))
 }

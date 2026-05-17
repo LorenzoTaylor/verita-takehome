@@ -540,7 +540,7 @@ async fn create_api_key(
 
     let raw_bytes: [u8; 32] = rand::random();
     let secret = format!("sk_{}", URL_SAFE_NO_PAD.encode(raw_bytes));
-    let prefix = secret.chars().take(12).collect::<String>();
+    let prefix = secret.chars().take(8).collect::<String>();
 
     let hash = tokio::task::spawn_blocking({
         let secret = secret.clone();
