@@ -375,6 +375,18 @@ async fn patch_line_item(
 
     let mut tx = state.db.begin().await?;
 
+    let invoice_status: Option<String> =
+        sqlx::query_scalar("SELECT status FROM invoices WHERE id = $1")
+            .bind(invoice_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+    match invoice_status.as_deref() {
+        None => return Err(AppError::NotFound),
+        Some("paid") => return Err(AppError::BadRequest("cannot override line items on a paid invoice".into())),
+        _ => {}
+    }
+
     // Validate line item belongs to this invoice and capture before state for audit
     let before = sqlx::query_as::<_, LineItemRow>(
         "SELECT id, description, units, unit_price_minor, total_minor, overridden_at

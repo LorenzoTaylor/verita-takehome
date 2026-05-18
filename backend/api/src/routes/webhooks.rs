@@ -1,4 +1,4 @@
-use axum::{http::StatusCode, routing::post, Json, Router};
+use axum::{http::StatusCode, routing::post, Router};
 use serde::Deserialize;
 use uuid::Uuid;
 

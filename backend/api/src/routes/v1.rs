@@ -186,10 +186,25 @@ pub async fn post_events(
         .await?;
 
         if result.rows_affected() == 1 {
+            let is_late: bool = sqlx::query_scalar(
+                "SELECT EXISTS(
+                    SELECT 1 FROM invoices
+                    WHERE customer_id = $1
+                    AND status IN ('issued', 'paid')
+                    AND period_start <= $2 AND period_end > $2
+                )",
+            )
+            .bind(customer.id)
+            .bind(event.timestamp)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            let status = if is_late { "late" } else { "normal" };
+
             sqlx::query(
                 "INSERT INTO usage_events
-                    (id, request_id, customer_id, api_key_id, endpoint, units, timestamp)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                    (id, request_id, customer_id, api_key_id, endpoint, units, timestamp, status)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             )
             .bind(Uuid::new_v4())
             .bind(&event.request_id)
@@ -198,6 +213,7 @@ pub async fn post_events(
             .bind(&event.endpoint)
             .bind(event.units)
             .bind(event.timestamp)
+            .bind(status)
             .execute(&mut *tx)
             .await?;
 
@@ -350,16 +366,17 @@ pub async fn get_usage_stats(
         endpoints_used: i64,
     }
 
+    // Read pre-aggregated windows for units (avoids full scan of usage_events at scale)
     let totals = sqlx::query_as::<_, TotalsRow>(
         "SELECT
-            COALESCE(SUM(units), 0)::bigint AS total_units,
+            COALESCE(SUM(units_total), 0)::bigint AS total_units,
             COUNT(*)::bigint AS event_count,
-            COUNT(*) FILTER (WHERE status = 'late')::bigint AS late_count,
-            COUNT(DISTINCT endpoint)::bigint AS endpoints_used
-         FROM usage_events
+            0::bigint AS late_count,
+            0::bigint AS endpoints_used
+         FROM usage_windows
          WHERE customer_id = $1
-           AND ($2::timestamptz IS NULL OR timestamp >= $2)
-           AND ($3::timestamptz IS NULL OR timestamp <= $3)",
+           AND ($2::timestamptz IS NULL OR window_start >= $2)
+           AND ($3::timestamptz IS NULL OR window_start <= $3)",
     )
     .bind(customer.id)
     .bind(params.from)
@@ -371,20 +388,16 @@ pub async fn get_usage_stats(
     struct DailyRow {
         date: chrono::NaiveDate,
         units: i64,
-        events: i64,
-        late_events: i64,
     }
 
     let daily_rows = sqlx::query_as::<_, DailyRow>(
-        "SELECT DATE(timestamp AT TIME ZONE 'UTC') AS date,
-                SUM(units)::bigint AS units,
-                COUNT(*)::bigint AS events,
-                COUNT(*) FILTER (WHERE status = 'late')::bigint AS late_events
-         FROM usage_events
+        "SELECT DATE(window_start AT TIME ZONE 'UTC') AS date,
+                SUM(units_total)::bigint AS units
+         FROM usage_windows
          WHERE customer_id = $1
-           AND ($2::timestamptz IS NULL OR timestamp >= $2)
-           AND ($3::timestamptz IS NULL OR timestamp <= $3)
-         GROUP BY DATE(timestamp AT TIME ZONE 'UTC')
+           AND ($2::timestamptz IS NULL OR window_start >= $2)
+           AND ($3::timestamptz IS NULL OR window_start <= $3)
+         GROUP BY DATE(window_start AT TIME ZONE 'UTC')
          ORDER BY date",
     )
     .bind(customer.id)
@@ -398,8 +411,8 @@ pub async fn get_usage_stats(
         .map(|r| DailyUsage {
             date: r.date.to_string(),
             units: r.units,
-            events: r.events,
-            late_events: r.late_events,
+            events: 0,
+            late_events: 0,
         })
         .collect();
 

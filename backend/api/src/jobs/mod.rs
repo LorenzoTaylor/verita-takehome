@@ -26,9 +26,9 @@ fn spawn(job_type: &'static str, interval: std::time::Duration, db: PgPool) {
 async fn try_run(job_type: &str, db: &PgPool) -> anyhow::Result<()> {
     let mut tx = db.begin().await?;
 
-    // Claim the row atomically; SKIP LOCKED means concurrent workers exit immediately
+    // Claim idle jobs, or running jobs stuck for >10 min (crashed without cleanup)
     let job_id: Option<uuid::Uuid> = sqlx::query_scalar(
-        "SELECT id FROM jobs WHERE job_type = $1 AND status = 'idle' FOR UPDATE SKIP LOCKED",
+        "SELECT id FROM jobs WHERE job_type = $1 AND (status = 'idle' OR (status = 'running' AND locked_at < now() - interval '10 minutes')) FOR UPDATE SKIP LOCKED",
     )
     .bind(job_type)
     .fetch_optional(&mut *tx)

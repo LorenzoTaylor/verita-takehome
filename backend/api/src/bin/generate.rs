@@ -4,7 +4,7 @@ use argon2::{
 };
 use chrono::{Datelike, DateTime, Duration, NaiveDate, Timelike, Utc, Weekday};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use rand::{distributions::Alphanumeric, Rng};
+use rand::Rng;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
@@ -419,7 +419,7 @@ async fn main() -> anyhow::Result<()> {
         for k in 0..key_count {
             let raw_bytes: [u8; 32] = rng.gen();
             let raw_key = format!("sk_{}", URL_SAFE_NO_PAD.encode(raw_bytes));
-            let prefix = raw_key.chars().take(12).collect::<String>();
+            let prefix = raw_key.chars().take(8).collect::<String>();
 
             let salt = SaltString::generate(&mut OsRng);
             let hash = Argon2::default()
@@ -597,7 +597,7 @@ async fn main() -> anyhow::Result<()> {
             };
 
             let invoice_id = Uuid::new_v4();
-            sqlx::query(
+            let inserted = sqlx::query(
                 "INSERT INTO invoices \
                  (id, customer_id, period_start, period_end, status, total_minor) \
                  VALUES ($1, $2, $3, $4, $5, $6) \
@@ -610,7 +610,12 @@ async fn main() -> anyhow::Result<()> {
             .bind(status)
             .bind(inv_total_minor)
             .execute(&pool)
-            .await?;
+            .await?
+            .rows_affected();
+
+            if inserted == 0 {
+                continue;
+            }
 
             for li in &line_items {
                 sqlx::query(

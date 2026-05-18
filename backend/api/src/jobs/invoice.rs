@@ -112,7 +112,7 @@ pub async fn run(db: &PgPool) -> anyhow::Result<()> {
 
         // Sum usage windows for this period (exclusive end)
         let total_units: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(units_total), 0)
+            "SELECT COALESCE(SUM(units_total), 0)::bigint
              FROM usage_windows
              WHERE customer_id = $1
                AND window_start >= $2

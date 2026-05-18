@@ -53,7 +53,7 @@ Four scenarios that had to hold:
 
 The window job runs hourly. It's a full recompute: `SELECT customer_id, date_trunc('hour', timestamp), SUM(units) FROM usage_events WHERE status = 'normal' GROUP BY ...` upserted into `usage_windows` with `ON CONFLICT DO UPDATE SET units_total = EXCLUDED.units_total`. Intentionally a full scan, not incremental. Each run is slower, but the result is always correct. Late events and retries land automatically on the next run, no bookkeeping required. At current scale this is fine; at 500M events/month the fix is partitioning, not incrementalism (see section 4).
 
-The invoice job runs monthly. It reads `usage_windows` for the billing period, applies tiered pricing from `price_plans` (tiers stored as JSONB, plan pinned at period start), and writes `invoice_line_items` and an `invoice` row. Invoices start as `draft` until explicitly issued.
+The invoice job runs monthly. It reads `usage_windows` for the billing period, applies tiered pricing from `price_plans` (tiers stored as JSONB, plan pinned at period start), and writes `invoice_line_items` and an `invoice` row. The invoice job writes invoices directly as `issued`; the `draft` status exists for invoices created manually outside the job.
 
 Windows are recomputable. Invoices in `issued` or `paid` state are not. The invoice job skips any customer that already has a non-draft invoice for that period. Line-item overrides are soft: `overridden_at` gets set and the new value is written, but the originals stay in the audit log.
 
@@ -117,7 +117,15 @@ A Postgres job table with `SKIP LOCKED` keeps it all in one place: the lock, the
 
 ---
 
-## 7. What wasn't built
+## 7. Operational observability
+
+**What to alert on.** The anomaly job writes five signals to `anomaly_flags`: usage 10× 30-day average, zero-usage drop, high-frequency `request_id` (retry loop), invoice spike vs. prior month, API key used from multiple IPs in a short window. The first two are worth waking someone up for — a spike or sudden zero usually means something broke in the customer's integration or the ingest pipeline. The rest go to the ops review queue.
+
+**How to debug a wrong invoice.** Start with the drift check: `SUM(units) FROM usage_events WHERE customer_id = $1 AND timestamp BETWEEN $start AND $end` vs `SUM(units_total) FROM usage_windows` for the same range. A gap means late events or a job that didn't finish. Then check `audit_log` for any line-item overrides or credits in that period. If there's still drift, rerun the window job — it's always safe and it overwrites stale totals. If numbers still don't line up, what's left is late events with `status = 'late'`, which are intentionally excluded from the current window.
+
+---
+
+## 8. What wasn't built
 
 **Event stream buffer.** `POST /v1/events` writes directly to Postgres. At 2,000 events/sec peak, a queue (Kafka or SQS) in front of ingestion is the standard buffer against spikes. It's purely additive: the consumer replaces the HTTP ingest path, nothing else changes.
 

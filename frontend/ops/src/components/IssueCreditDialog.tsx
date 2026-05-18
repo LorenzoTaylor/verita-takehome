@@ -93,6 +93,9 @@ export default function IssueCreditDialog({ open, onClose, token, customer, onSu
                   placeholder="e.g. Goodwill — service incident on May 14"
                 />
                 <p className="text-[11.5px] text-muted-foreground">{reason.length}/280</p>
+                {reason.trim().length > 0 && reason.trim().length < 6 && (
+                  <p className="text-[11.5px] text-destructive">Reason must be at least 6 characters</p>
+                )}
               </div>
             </DialogBody>
             <DialogFooter>

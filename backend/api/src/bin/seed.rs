@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
     // sk_-prefixed key: 32 random bytes base64-encoded
     let raw_bytes: [u8; 32] = rng.gen();
     let key = format!("sk_{}", URL_SAFE_NO_PAD.encode(raw_bytes));
-    let prefix = key.chars().take(12).collect::<String>();
+    let prefix = key.chars().take(8).collect::<String>();
 
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
