@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { Icon } from "@/components/SidebarLayout"
+import { API_BASE } from "@/api"
 
 type ApiKey = {
   id: string
@@ -18,7 +19,7 @@ type ApiKey = {
 }
 
 async function apiFetch<T>(url: string, token: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetch(API_BASE + url, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...init?.headers },
   })
@@ -52,7 +53,7 @@ export default function ApiKeysPage({ token }: { token: string }) {
   }
 
   async function handleRevoke(id: string) {
-    await fetch(`/v1/api-keys/${id}`, {
+    await fetch(`${API_BASE}/v1/api-keys/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     })

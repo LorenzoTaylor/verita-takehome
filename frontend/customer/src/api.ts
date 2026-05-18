@@ -54,7 +54,7 @@ function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}` }
 }
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ""
+export const API_BASE = import.meta.env.VITE_API_URL ?? ""
 
 async function apiFetch<T>(url: string, token: string): Promise<T> {
   const res = await fetch(API_BASE + url, { headers: authHeaders(token) })
