@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { fetchAnomalies, type AnomalyListItem } from "@/api"
+import { fetchAnomaliesPage, type AnomalyListItem } from "@/api"
 
 type CustomerGroup = {
   customer_id: string
@@ -28,15 +28,39 @@ function AlertIcon() {
 
 export default function AnomaliesPage({ token }: { token: string }) {
   const [anomalies, setAnomalies] = useState<AnomalyListItem[]>([])
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [total, setTotal] = useState<number | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    fetchAnomalies(token)
-      .then(setAnomalies)
+    fetchAnomaliesPage(token)
+      .then((res) => {
+        setAnomalies(res.data)
+        setCursor(res.next_cursor)
+        setTotal(res.total)
+        setHasMore(res.next_cursor !== null)
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [token])
+
+  async function loadMore() {
+    if (!cursor) return
+    setLoadingMore(true)
+    try {
+      const res = await fetchAnomaliesPage(token, cursor)
+      setAnomalies((prev) => [...prev, ...res.data])
+      setCursor(res.next_cursor)
+      setHasMore(res.next_cursor !== null)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const open = anomalies.filter((a) => !a.resolved_at)
 
@@ -60,6 +84,11 @@ export default function AnomaliesPage({ token }: { token: string }) {
     <>
       <div className="h-14 flex-shrink-0 border-b border-[hsl(var(--verita-border))] bg-white flex items-center px-7 gap-3.5">
         <h1 className="text-base font-semibold tracking-tight">Anomalies</h1>
+        {!loading && !error && total !== null && (
+          <span className="text-[13px] text-muted-foreground">
+            {hasMore ? `1–${anomalies.length} of ${total}` : `${total} total`}
+          </span>
+        )}
       </div>
 
       <div className="p-7 w-full space-y-5">
@@ -96,6 +125,7 @@ export default function AnomaliesPage({ token }: { token: string }) {
         {affected.length > 0 && (
           <div className="bg-white rounded-xl border border-[hsl(var(--verita-border))] shadow-sm overflow-hidden">
             {affected.map((c, i) => (
+
               <div
                 key={c.customer_id}
                 className={`px-5 py-4 flex items-center gap-4 ${i < affected.length - 1 ? "border-b border-[hsl(var(--verita-border))]" : ""}`}
@@ -117,6 +147,13 @@ export default function AnomaliesPage({ token }: { token: string }) {
                 </div>
               </div>
             ))}
+            {hasMore && (
+              <div className="px-5 py-3 border-t border-[hsl(var(--verita-border))] flex justify-center">
+                <button onClick={loadMore} disabled={loadingMore} className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-50">
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

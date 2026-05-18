@@ -4,22 +4,46 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/SidebarLayout"
-import { fetchCustomers, fetchOverview, type Customer } from "@/api"
+import { fetchCustomersPage, fetchOverview, type Customer } from "@/api"
 
 export default function CustomerList({ token }: { token: string }) {
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [total, setTotal] = useState<number | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [activeAnomalies, setActiveAnomalies] = useState(0)
 
   useEffect(() => {
-    fetchCustomers(token)
-      .then(setCustomers)
+    fetchCustomersPage(token)
+      .then((res) => {
+        setCustomers(res.data)
+        setCursor(res.next_cursor)
+        setTotal(res.total)
+        setHasMore(res.next_cursor !== null)
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
     fetchOverview(token).then((s) => setActiveAnomalies(s.total_open_anomalies)).catch(() => {})
   }, [token])
+
+  async function loadMore() {
+    if (!cursor) return
+    setLoadingMore(true)
+    try {
+      const res = await fetchCustomersPage(token, cursor)
+      setCustomers((prev) => [...prev, ...res.data])
+      setCursor(res.next_cursor)
+      setHasMore(res.next_cursor !== null)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const filtered = customers.filter(
     (c) =>
@@ -51,7 +75,7 @@ export default function CustomerList({ token }: { token: string }) {
           <div>
             <h2 className="text-[22px] font-semibold tracking-[-0.018em]">All customers</h2>
             <p className="text-[13.5px] text-muted-foreground mt-1">
-              {customers.length} total · {newThisMonth} new this month
+              {total ?? customers.length} total · {newThisMonth} new this month
             </p>
           </div>
         </div>
@@ -128,7 +152,15 @@ export default function CustomerList({ token }: { token: string }) {
 
           {!loading && !error && filtered.length > 0 && (
             <div className="px-5 py-3 flex items-center justify-between border-t border-[hsl(var(--verita-border))] bg-[hsl(60_8%_97%)] text-[12.5px] text-muted-foreground">
-              <span>Showing {filtered.length} of {customers.length}</span>
+              <span>
+                {search ? `${filtered.length} matching · ` : ""}
+                {hasMore ? `1–${customers.length} of ${total}` : `${customers.length} total`}
+              </span>
+              {hasMore && (
+                <button onClick={loadMore} disabled={loadingMore} className="text-primary hover:underline disabled:opacity-50">
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -7,7 +7,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/SidebarLayout"
 import {
-  fetchCustomers, fetchOverview, fetchAnomalies, fetchRevenueChart, fetchEventsByHour, formatMoney,
+  fetchCustomersPage, fetchOverview, fetchAnomaliesPage, fetchRevenueChart, fetchEventsByHour, formatMoney,
   type Customer, type OverviewStats, type AnomalyListItem, type RevenueDay, type EventsHour,
 } from "@/api"
 
@@ -67,8 +67,8 @@ export default function OverviewPage({ token }: { token: string }) {
 
   // Customers and anomalies load once
   useEffect(() => {
-    fetchCustomers(token).then(setCustomers).catch((e) => setError(e.message))
-    fetchAnomalies(token).then(setAllAnomalies).catch(() => {})
+    fetchCustomersPage(token).then((res) => setCustomers(res.data)).catch((e) => setError(e.message))
+    fetchAnomaliesPage(token).then((res) => setAllAnomalies(res.data)).catch(() => {})
     fetchRevenueChart(token, 90).then(setChartData).catch(() => {})
     fetchEventsByHour(token).then(setEventsByHour).catch(() => {})
   }, [token])
@@ -132,8 +132,8 @@ export default function OverviewPage({ token }: { token: string }) {
         <span className="text-[13px] text-muted-foreground">/</span>
         <span className="text-[13px] text-muted-foreground">All customers</span>
         <div className="ml-auto flex items-center gap-2">
-          <Badge variant={anomalies.length === 0 ? "success" : "warning"} className="mr-1">
-                        {anomalies.length === 0 ? "all systems normal" : `${anomalies.length} anomalies`}
+          <Badge variant={!stats?.total_open_anomalies ? "success" : "warning"} className="mr-1">
+            {!stats?.total_open_anomalies ? "all systems normal" : `${stats.total_open_anomalies > 99 ? "99+" : stats.total_open_anomalies} anomalies`}
           </Badge>
         </div>
       </div>
@@ -142,10 +142,6 @@ export default function OverviewPage({ token }: { token: string }) {
         <div className="flex items-end justify-between mb-5">
           <div>
             <h2 className="text-[22px] font-semibold tracking-[-0.018em]">{greeting()}</h2>
-            <p className="text-[13.5px] text-muted-foreground mt-1">
-              {stats?.total_customers ?? customers.length} active customers
-              {anomalies.length > 0 ? ` · ${anomalies.length} anomalies need review` : ""}
-            </p>
           </div>
           <div className="flex gap-0.5 bg-[hsl(60_8%_95%)] p-0.5 rounded-md">
             {["Today", "7d", "30d", "90d"].map((r) => (

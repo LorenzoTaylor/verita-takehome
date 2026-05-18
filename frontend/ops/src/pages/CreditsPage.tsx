@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { fetchAllCredits, fetchCustomers, formatMoney, type CreditListItem, type Customer } from "@/api"
+import { fetchCreditsPage, fetchCustomersPage, formatMoney, type CreditListItem, type Customer } from "@/api"
 import IssueCreditDialog from "@/components/IssueCreditDialog"
 
 export default function CreditsPage({ token }: { token: string }) {
   const [credits, setCredits] = useState<CreditListItem[]>([])
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [total, setTotal] = useState<number | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -14,16 +18,41 @@ export default function CreditsPage({ token }: { token: string }) {
   const [pickOpen, setPickOpen] = useState(false)
 
   function reload() {
-    fetchAllCredits(token).then(setCredits).catch(() => {})
+    fetchCreditsPage(token).then((res) => {
+      setCredits(res.data)
+      setCursor(res.next_cursor)
+      setTotal(res.total)
+      setHasMore(res.next_cursor !== null)
+    }).catch(() => {})
   }
 
   useEffect(() => {
-    fetchAllCredits(token)
-      .then(setCredits)
+    fetchCreditsPage(token)
+      .then((res) => {
+        setCredits(res.data)
+        setCursor(res.next_cursor)
+        setTotal(res.total)
+        setHasMore(res.next_cursor !== null)
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
-    fetchCustomers(token).then(setCustomers).catch(() => {})
+    fetchCustomersPage(token).then((res) => setCustomers(res.data)).catch(() => {})
   }, [token])
+
+  async function loadMore() {
+    if (!cursor) return
+    setLoadingMore(true)
+    try {
+      const res = await fetchCreditsPage(token, cursor)
+      setCredits((prev) => [...prev, ...res.data])
+      setCursor(res.next_cursor)
+      setHasMore(res.next_cursor !== null)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   function openIssueCredit() {
     setSelectedCustomer(null)
@@ -41,7 +70,9 @@ export default function CreditsPage({ token }: { token: string }) {
       <div className="h-14 flex-shrink-0 border-b border-[hsl(var(--verita-border))] bg-white flex items-center px-7 gap-3.5">
         <h1 className="text-base font-semibold tracking-tight">Credits</h1>
         {!loading && !error && (
-          <span className="text-[13px] text-muted-foreground">{credits.length} total</span>
+          <span className="text-[13px] text-muted-foreground">
+            {hasMore ? `1–${credits.length} of ${total}` : `${total ?? credits.length} total`}
+          </span>
         )}
         <div className="ml-auto">
           <Button size="sm" className="h-8" onClick={openIssueCredit}>
@@ -86,6 +117,13 @@ export default function CreditsPage({ token }: { token: string }) {
                 ))}
               </tbody>
             </table>
+          )}
+          {hasMore && (
+            <div className="px-5 py-3 border-t border-[hsl(var(--verita-border))] flex justify-center">
+              <button onClick={loadMore} disabled={loadingMore} className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-50">
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            </div>
           )}
         </div>
       </div>

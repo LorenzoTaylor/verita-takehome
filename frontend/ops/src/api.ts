@@ -44,9 +44,9 @@ export async function login(email: string, password: string): Promise<string> {
   return data.token as string
 }
 
-export async function fetchCustomers(token: string): Promise<Customer[]> {
-  const res = await apiFetch<{ data: Customer[]; next_cursor: string | null }>("/ops/customers", token)
-  return res.data
+export async function fetchCustomersPage(token: string, cursor?: string): Promise<{ data: Customer[]; next_cursor: string | null; total: number }> {
+  const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
+  return apiFetch(`/ops/customers${qs}`, token)
 }
 
 export async function fetchCustomer(token: string, id: string): Promise<CustomerDetail> {
@@ -146,19 +146,19 @@ export async function fetchOverview(token: string, days?: number): Promise<Overv
   return apiFetch(`/ops/overview${qs}`, token)
 }
 
-export async function fetchInvoicesPage(token: string, cursor?: string): Promise<{ data: InvoiceListItem[]; next_cursor: string | null }> {
+export async function fetchInvoicesPage(token: string, cursor?: string): Promise<{ data: InvoiceListItem[]; next_cursor: string | null; total: number }> {
   const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
   return apiFetch(`/ops/invoices${qs}`, token)
 }
 
-export async function fetchAllCredits(token: string): Promise<CreditListItem[]> {
-  const res = await apiFetch<{ data: CreditListItem[]; next_cursor: string | null }>("/ops/credits", token)
-  return res.data
+export async function fetchCreditsPage(token: string, cursor?: string): Promise<{ data: CreditListItem[]; next_cursor: string | null; total: number }> {
+  const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
+  return apiFetch(`/ops/credits${qs}`, token)
 }
 
-export async function fetchAnomalies(token: string): Promise<AnomalyListItem[]> {
-  const res = await apiFetch<{ data: AnomalyListItem[]; next_cursor: string | null }>("/ops/anomalies", token)
-  return res.data
+export async function fetchAnomaliesPage(token: string, cursor?: string): Promise<{ data: AnomalyListItem[]; next_cursor: string | null; total: number }> {
+  const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
+  return apiFetch(`/ops/anomalies${qs}`, token)
 }
 
 export type EventsHour = { h: string; events: number }

@@ -62,6 +62,7 @@ struct OpsPageParams {
 struct Paginated<T: Serialize> {
     data: Vec<T>,
     next_cursor: Option<String>,
+    total: i64,
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
@@ -169,7 +170,11 @@ async fn get_customers(
         None
     };
 
-    Ok(Json(Paginated { data: rows, next_cursor }))
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM customers")
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok(Json(Paginated { data: rows, next_cursor, total }))
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -695,7 +700,11 @@ async fn get_all_invoices(
         None
     };
 
-    Ok(Json(Paginated { data: rows, next_cursor }))
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM invoices")
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok(Json(Paginated { data: rows, next_cursor, total }))
 }
 
 // ── All credits ───────────────────────────────────────────────────────────────
@@ -750,7 +759,11 @@ async fn get_all_credits(
         None
     };
 
-    Ok(Json(Paginated { data: rows, next_cursor }))
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM credits")
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok(Json(Paginated { data: rows, next_cursor, total }))
 }
 
 // ── Anomalies ─────────────────────────────────────────────────────────────────
@@ -809,5 +822,9 @@ async fn get_anomalies(
         None
     };
 
-    Ok(Json(Paginated { data: rows, next_cursor }))
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anomaly_flags WHERE resolved_at IS NULL")
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok(Json(Paginated { data: rows, next_cursor, total }))
 }

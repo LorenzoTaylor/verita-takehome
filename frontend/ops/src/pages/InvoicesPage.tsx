@@ -12,6 +12,7 @@ const statusVariant: Record<string, "secondary" | "info" | "success"> = {
 export default function InvoicesPage({ token }: { token: string }) {
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
+  const [total, setTotal] = useState<number | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -22,6 +23,7 @@ export default function InvoicesPage({ token }: { token: string }) {
       .then((res) => {
         setInvoices(res.data)
         setCursor(res.next_cursor)
+        setTotal(res.total)
         setHasMore(res.next_cursor !== null)
       })
       .catch((e) => setError(e.message))
@@ -36,6 +38,7 @@ export default function InvoicesPage({ token }: { token: string }) {
       setInvoices((prev) => [...prev, ...res.data])
       setCursor(res.next_cursor)
       setHasMore(res.next_cursor !== null)
+      setTotal(res.total)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -49,7 +52,7 @@ export default function InvoicesPage({ token }: { token: string }) {
         <h1 className="text-base font-semibold tracking-tight">Invoices</h1>
         {!loading && !error && (
           <span className="text-[13px] text-muted-foreground">
-            {invoices.length}{hasMore ? "+" : ""} invoices
+            {hasMore ? `1–${invoices.length} of ${total}` : `${total ?? invoices.length} total`}
           </span>
         )}
       </div>
