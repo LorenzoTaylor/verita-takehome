@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Icon } from "@/components/SidebarLayout"
 import { cn } from "@/lib/utils"
-import { patchLineItem, formatMoney, type Invoice, type LineItem } from "@/api"
+import { patchLineItem, formatMoney, API_BASE, type Invoice, type LineItem } from "@/api"
 
 type Props = {
   open: boolean
@@ -34,7 +34,7 @@ export default function OverrideLineItemDialog({ open, onClose, token, invoice, 
   useEffect(() => {
     if (!open) return
     setLoading(true); setError(""); setSelected(null); setNewTotal(""); setReason("")
-    fetch(`/ops/invoices/${invoice.id}/line-items`, {
+    fetch(`${API_BASE}/ops/invoices/${invoice.id}/line-items`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async (r) => {

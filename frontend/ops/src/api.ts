@@ -19,7 +19,7 @@ export type AnomalyFlag = {
 
 export type CustomerDetail = Customer & { invoices: Invoice[]; credits: Credit[] }
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ""
+export const API_BASE = import.meta.env.VITE_API_URL ?? ""
 
 async function apiFetch<T>(url: string, token: string, init?: RequestInit): Promise<T> {
   const res = await fetch(API_BASE + url, {

@@ -40,8 +40,7 @@ export default function CustomerList({ token }: { token: string }) {
         <h1 className="text-base font-semibold tracking-tight">Customers</h1>
         <div className="ml-auto flex items-center gap-2">
           <Badge variant={activeAnomalies > 0 ? "warning" : "success"} className="mr-1">
-            <span className="w-1 h-1 rounded-full bg-current mr-1" />
-            {activeAnomalies > 0 ? `${activeAnomalies} anomalies` : "all systems normal"}
+                        {activeAnomalies > 0 ? `${activeAnomalies} anomalies` : "all systems normal"}
           </Badge>
         </div>
       </div>
@@ -94,16 +93,14 @@ export default function CustomerList({ token }: { token: string }) {
                 )}
                 {filtered.map((c) => {
                   const initials = c.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
-                  const hue = (c.id.charCodeAt(0) * 7) % 360
+                  const AVATAR_COLORS = ["#4285F4","#EA4335","#34A853","#9C27B0","#FF5722","#00ACC1","#3F51B5","#E91E63","#00897B","#F4511E"]
+                  const colorIdx = parseInt(c.id.replace(/-/g, "").slice(0, 4), 16) % AVATAR_COLORS.length
                   return (
                     <tr key={c.id} className="border-b last:border-0 border-[hsl(var(--verita-border))] hover:bg-[hsl(60_8%_97%)] transition-colors group">
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-[26px] h-[26px] rounded-md grid place-items-center text-[11px] font-semibold tracking-tight"
-                            style={{
-                              background: `hsl(${hue} 50% 92%)`,
-                              color: `hsl(${hue} 40% 35%)`,
-                            }}>
+                          <div className="w-[34px] h-[34px] rounded-full grid place-items-center text-[12px] font-semibold text-white flex-shrink-0"
+                            style={{ background: AVATAR_COLORS[colorIdx] }}>
                             {initials || "?"}
                           </div>
                           <div className="font-medium">{c.name}</div>

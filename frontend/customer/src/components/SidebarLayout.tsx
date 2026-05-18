@@ -45,7 +45,7 @@ export default function SidebarLayout({ children, onSignOut, userName = "", user
       <aside className="w-[232px] flex-shrink-0 bg-[hsl(var(--verita-sidebar))] border-r border-[hsl(var(--verita-border))] flex flex-col p-[10px] gap-1">
         {/* Workspace identity — non-interactive */}
         <div className="flex items-center gap-[9px] px-2 py-[7px]">
-          <span className="flex-1 text-left text-[13.5px] font-medium tracking-tight">Lattice Cloud</span>
+          <span className="flex-1 text-left text-[13.5px] font-medium tracking-tight">verita · customer</span>
         </div>
 
         <div className="mt-1.5">

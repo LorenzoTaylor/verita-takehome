@@ -133,13 +133,12 @@ export default function OverviewPage({ token }: { token: string }) {
         <span className="text-[13px] text-muted-foreground">All customers</span>
         <div className="ml-auto flex items-center gap-2">
           <Badge variant={anomalies.length === 0 ? "success" : "warning"} className="mr-1">
-            <span className="w-1 h-1 rounded-full bg-current mr-1" />
-            {anomalies.length === 0 ? "all systems normal" : `${anomalies.length} anomalies`}
+                        {anomalies.length === 0 ? "all systems normal" : `${anomalies.length} anomalies`}
           </Badge>
         </div>
       </div>
 
-      <div className="p-7 w-full max-w-[1440px]">
+      <div className="p-7 w-full">
         <div className="flex items-end justify-between mb-5">
           <div>
             <h2 className="text-[22px] font-semibold tracking-[-0.018em]">{greeting()}</h2>
@@ -284,7 +283,7 @@ export default function OverviewPage({ token }: { token: string }) {
                   >
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <Badge variant={sev === "high" ? "destructive" : sev === "med" ? "warning" : "secondary"} className="text-[10.5px]">
-                        <span className="w-1 h-1 rounded-full bg-current mr-1" />{sev}
+                        {sev}
                       </Badge>
                       <span className="font-mono-numeric text-[11px] text-[hsl(var(--verita-fg-subtle))]">{a.id.slice(0, 8)}</span>
                     </div>
@@ -322,14 +321,15 @@ export default function OverviewPage({ token }: { token: string }) {
             <tbody>
               {customers.slice(0, 8).map((c) => {
                 const initials = c.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
-                const hue = (c.id.charCodeAt(0) * 7) % 360
+                const AVATAR_COLORS = ["#4285F4","#EA4335","#34A853","#9C27B0","#FF5722","#00ACC1","#3F51B5","#E91E63","#00897B","#F4511E"]
+                const avatarColor = AVATAR_COLORS[parseInt(c.id.replace(/-/g, "").slice(0, 4), 16) % AVATAR_COLORS.length]
                 return (
                   <tr key={c.id} className="border-b last:border-0 border-[hsl(var(--verita-border))] hover:bg-[hsl(60_8%_97%)] group">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2.5">
                         <div
-                          className="w-[26px] h-[26px] rounded-md grid place-items-center text-[11px] font-semibold tracking-tight"
-                          style={{ background: `hsl(${hue} 50% 92%)`, color: `hsl(${hue} 40% 35%)` }}
+                          className="w-[34px] h-[34px] rounded-full grid place-items-center text-[12px] font-semibold text-white flex-shrink-0"
+                          style={{ background: avatarColor }}
                         >{initials || "?"}</div>
                         <span className="font-medium">{c.name}</span>
                       </div>

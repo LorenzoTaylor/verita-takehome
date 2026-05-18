@@ -62,27 +62,23 @@ export default function AnomaliesPage({ token }: { token: string }) {
         <h1 className="text-base font-semibold tracking-tight">Anomalies</h1>
       </div>
 
-      <div className="p-7 w-full max-w-[1280px] space-y-5">
+      <div className="p-7 w-full space-y-5">
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {/* Status banner */}
-        <div className={`rounded-xl border shadow-sm px-6 py-5 flex items-center gap-4 ${
-          loading ? "bg-white border-[hsl(var(--verita-border))]"
-          : allClear ? "bg-green-50 border-green-200"
-          : "bg-amber-50 border-amber-200"
+        <div className={`rounded-xl border shadow-sm px-6 py-5 flex items-center gap-4 bg-white ${
+          loading ? "border-[hsl(var(--verita-border))]"
+          : allClear ? "border-green-200"
+          : "border-amber-300"
         }`}>
-          <div className={`w-10 h-10 rounded-full grid place-items-center flex-shrink-0 ${
-            loading ? "bg-[hsl(60_8%_94%)]"
-            : allClear ? "bg-green-100"
-            : "bg-amber-100"
-          }`}>
+          <div className="flex-shrink-0">
             {!loading && (allClear ? <CheckIcon /> : <AlertIcon />)}
           </div>
           <div>
             <div className={`text-sm font-semibold ${
               loading ? "text-foreground"
               : allClear ? "text-green-800"
-              : "text-amber-900"
+              : "text-foreground"
             }`}>
               {loading ? "Checking…"
                 : allClear ? "All clear"
@@ -110,7 +106,7 @@ export default function AnomaliesPage({ token }: { token: string }) {
                   </Link>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {c.signals.map((sig) => (
-                      <span key={sig} className="inline-flex items-center px-2 py-px rounded text-[11px] font-mono bg-amber-50 text-amber-800 border border-amber-200">
+                      <span key={sig} className="inline-flex items-center px-2 py-px rounded text-[11px] font-mono text-amber-700 border border-amber-300">
                         {sig}
                       </span>
                     ))}

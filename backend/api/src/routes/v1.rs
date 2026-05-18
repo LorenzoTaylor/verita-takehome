@@ -235,7 +235,7 @@ pub struct UsageQuery {
     pub limit: Option<i64>,
     pub from: Option<DateTime<Utc>>,
     pub to: Option<DateTime<Utc>>,
-    pub api_key_id: Option<Uuid>,
+    pub key_prefix: Option<String>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -285,7 +285,8 @@ pub async fn get_usage(
              WHERE customer_id = $1
                AND ($2::timestamptz IS NULL OR timestamp >= $2)
                AND ($3::timestamptz IS NULL OR timestamp <= $3)
-               AND ($4::uuid IS NULL OR api_key_id = $4)
+               AND ($4::text IS NULL OR api_key_id IN (
+                     SELECT id FROM api_keys WHERE customer_id = $1 AND prefix ILIKE ($4 || '%')))
                AND (timestamp < $5 OR (timestamp = $5 AND id < $6))
              ORDER BY timestamp DESC, id DESC
              LIMIT $7",
@@ -293,7 +294,7 @@ pub async fn get_usage(
         .bind(customer.id)
         .bind(params.from)
         .bind(params.to)
-        .bind(params.api_key_id)
+        .bind(params.key_prefix)
         .bind(cursor_ts)
         .bind(cursor_id)
         .bind(limit)
@@ -306,14 +307,15 @@ pub async fn get_usage(
              WHERE customer_id = $1
                AND ($2::timestamptz IS NULL OR timestamp >= $2)
                AND ($3::timestamptz IS NULL OR timestamp <= $3)
-               AND ($4::uuid IS NULL OR api_key_id = $4)
+               AND ($4::text IS NULL OR api_key_id IN (
+                     SELECT id FROM api_keys WHERE customer_id = $1 AND prefix ILIKE ($4 || '%')))
              ORDER BY timestamp DESC, id DESC
              LIMIT $5",
         )
         .bind(customer.id)
         .bind(params.from)
         .bind(params.to)
-        .bind(params.api_key_id)
+        .bind(params.key_prefix)
         .bind(limit)
         .fetch_all(&state.db)
         .await?
@@ -366,17 +368,17 @@ pub async fn get_usage_stats(
         endpoints_used: i64,
     }
 
-    // Read pre-aggregated windows for units (avoids full scan of usage_events at scale)
+    // All stats from usage_events — guarantees total_units == sum(daily.units)
     let totals = sqlx::query_as::<_, TotalsRow>(
         "SELECT
-            COALESCE(SUM(units_total), 0)::bigint AS total_units,
+            COALESCE(SUM(units), 0)::bigint AS total_units,
             COUNT(*)::bigint AS event_count,
-            0::bigint AS late_count,
-            0::bigint AS endpoints_used
-         FROM usage_windows
+            COUNT(*) FILTER (WHERE status = 'late')::bigint AS late_count,
+            COUNT(DISTINCT endpoint)::bigint AS endpoints_used
+         FROM usage_events
          WHERE customer_id = $1
-           AND ($2::timestamptz IS NULL OR window_start >= $2)
-           AND ($3::timestamptz IS NULL OR window_start <= $3)",
+           AND ($2::timestamptz IS NULL OR timestamp >= $2)
+           AND ($3::timestamptz IS NULL OR timestamp <= $3)",
     )
     .bind(customer.id)
     .bind(params.from)
@@ -388,16 +390,21 @@ pub async fn get_usage_stats(
     struct DailyRow {
         date: chrono::NaiveDate,
         units: i64,
+        events: i64,
+        late_events: i64,
     }
 
     let daily_rows = sqlx::query_as::<_, DailyRow>(
-        "SELECT DATE(window_start AT TIME ZONE 'UTC') AS date,
-                SUM(units_total)::bigint AS units
-         FROM usage_windows
+        "SELECT
+            DATE(timestamp AT TIME ZONE 'UTC') AS date,
+            COALESCE(SUM(units), 0)::bigint AS units,
+            COUNT(*)::bigint AS events,
+            COUNT(*) FILTER (WHERE status = 'late')::bigint AS late_events
+         FROM usage_events
          WHERE customer_id = $1
-           AND ($2::timestamptz IS NULL OR window_start >= $2)
-           AND ($3::timestamptz IS NULL OR window_start <= $3)
-         GROUP BY DATE(window_start AT TIME ZONE 'UTC')
+           AND ($2::timestamptz IS NULL OR timestamp >= $2)
+           AND ($3::timestamptz IS NULL OR timestamp <= $3)
+         GROUP BY DATE(timestamp AT TIME ZONE 'UTC')
          ORDER BY date",
     )
     .bind(customer.id)
@@ -411,8 +418,8 @@ pub async fn get_usage_stats(
         .map(|r| DailyUsage {
             date: r.date.to_string(),
             units: r.units,
-            events: 0,
-            late_events: 0,
+            events: r.events,
+            late_events: r.late_events,
         })
         .collect();
 

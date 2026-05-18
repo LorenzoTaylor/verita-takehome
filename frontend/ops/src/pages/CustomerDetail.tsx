@@ -47,6 +47,8 @@ export default function CustomerDetail({ token }: { token: string }) {
   const totalUsage = usageData.reduce((s, d) => s + d.units, 0)
 
   const initials = detail?.name?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() ?? "?"
+  const AVATAR_COLORS = ["#4285F4","#EA4335","#34A853","#9C27B0","#FF5722","#00ACC1","#3F51B5","#E91E63","#00897B","#F4511E"]
+  const avatarColor = detail ? AVATAR_COLORS[parseInt(detail.id.replace(/-/g, "").slice(0, 4), 16) % AVATAR_COLORS.length] : "#4285F4"
   const totalLifetime = detail?.invoices.reduce((s, i) => s + i.total_minor, 0) ?? 0
   const openBalance = detail?.invoices.filter((i) => i.status !== "paid").reduce((s, i) => s + i.total_minor, 0) ?? 0
   const totalCredits = detail?.credits.length ?? 0
@@ -70,14 +72,15 @@ export default function CustomerDetail({ token }: { token: string }) {
         </div>
       </div>
 
-      <div className="p-7 w-full max-w-[1280px]">
+      <div className="p-7 w-full">
         {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
         {error && <div className="text-sm text-destructive">{error}</div>}
         {detail && (
           <>
             {/* Customer header */}
             <div className="bg-white rounded-xl border border-[hsl(var(--verita-border))] shadow-sm mb-5 px-6 py-5 flex items-center gap-4">
-              <div className="w-[52px] h-[52px] rounded-[10px] bg-[hsl(258_40%_92%)] text-[hsl(258_50%_35%)] grid place-items-center text-lg font-semibold tracking-tight">
+              <div className="w-[52px] h-[52px] rounded-full grid place-items-center text-lg font-semibold text-white flex-shrink-0"
+                style={{ background: avatarColor }}>
                 {initials}
               </div>
               <div className="flex-1 min-w-0">
@@ -173,7 +176,7 @@ export default function CustomerDetail({ token }: { token: string }) {
                         <td className="px-5 py-3 text-right font-mono-numeric tabular font-medium">{formatMoney(inv.total_minor)}</td>
                         <td className="px-5 py-3">
                           <Badge variant={inv.status === "paid" ? "success" : inv.status === "issued" ? "info" : "secondary"}>
-                            <span className="w-1 h-1 rounded-full bg-current mr-1" />{inv.status}
+                            {inv.status}
                           </Badge>
                         </td>
                         <td className="px-5 py-3 text-right">

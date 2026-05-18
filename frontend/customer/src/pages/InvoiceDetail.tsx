@@ -45,7 +45,7 @@ export default function InvoiceDetail({ token }: { token: string }) {
                 <div>
                   <div className="flex items-center gap-2.5 mb-2.5">
                     <Badge variant={invoice.status === "paid" ? "success" : invoice.status === "issued" ? "info" : "secondary"}>
-                      <span className="w-1 h-1 rounded-full bg-current mr-1" />{invoice.status}
+                      {invoice.status}
                     </Badge>
                     <span className="font-mono-numeric text-xs text-muted-foreground">INV-{invoice.id.slice(0, 8)}</span>
                   </div>

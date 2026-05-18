@@ -187,7 +187,7 @@ export default function Dashboard({ token }: { token: string }) {
                     <td className="px-4 py-3 text-right tabular font-mono-numeric">{e.units}</td>
                     <td className="px-4 py-3">
                       <Badge variant={e.status === "normal" ? "success" : "warning"}>
-                        <span className="w-1 h-1 rounded-full bg-current mr-1" />{e.status}
+                        {e.status}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{relativeTime(e.timestamp)}</td>
@@ -217,7 +217,7 @@ export default function Dashboard({ token }: { token: string }) {
                   <div className="text-right">
                     <div className="font-mono-numeric text-[13.5px] font-semibold">{formatMoney(inv.total_minor)}</div>
                     <Badge variant={inv.status === "paid" ? "success" : "info"} className="mt-0.5">
-                      <span className="w-1 h-1 rounded-full bg-current mr-1" />{inv.status}
+                      {inv.status}
                     </Badge>
                   </div>
                 </div>
@@ -234,7 +234,7 @@ export default function Dashboard({ token }: { token: string }) {
                   <div className="text-right">
                     <div className="font-mono-numeric text-[13.5px] font-semibold">{formatMoney(openInvoice.total_minor)}</div>
                     <Badge className="mt-0.5 bg-[hsl(var(--verita-accent-soft))] text-[hsl(var(--verita-accent-soft-fg))] border-transparent">
-                      <span className="w-1 h-1 rounded-full bg-current mr-1" />open
+                      open
                     </Badge>
                   </div>
                 </div>

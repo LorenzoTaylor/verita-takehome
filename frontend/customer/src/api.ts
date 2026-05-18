@@ -47,7 +47,7 @@ export type UsageFilters = {
   limit?: number
   from?: string
   to?: string
-  api_key_id?: string
+  key_prefix?: string
 }
 
 function authHeaders(token: string) {
@@ -86,7 +86,7 @@ export async function fetchUsage(token: string, filters: UsageFilters = {}): Pro
   if (filters.limit) params.set("limit", String(filters.limit))
   if (filters.from) params.set("from", filters.from)
   if (filters.to) params.set("to", filters.to)
-  if (filters.api_key_id) params.set("api_key_id", filters.api_key_id)
+  if (filters.key_prefix) params.set("key_prefix", filters.key_prefix)
   const qs = params.toString()
   return apiFetch(`/v1/usage${qs ? `?${qs}` : ""}`, token)
 }

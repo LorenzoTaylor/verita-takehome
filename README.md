@@ -6,7 +6,7 @@
 
 | | Email | Password |
 |---|---|---|
-| Customer portal | `test-7lv2wb@example.com` | `customer-local-password` |
+| Customer portal | `customer@example.com` | `customer-local-password` |
 | Ops console | `ops@example.com` | `ops-local-password` |
 
 ---

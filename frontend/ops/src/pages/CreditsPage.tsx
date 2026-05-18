@@ -50,7 +50,7 @@ export default function CreditsPage({ token }: { token: string }) {
         </div>
       </div>
 
-      <div className="p-7 w-full max-w-[1280px]">
+      <div className="p-7 w-full">
         <div className="bg-white rounded-xl border border-[hsl(var(--verita-border))] shadow-sm overflow-hidden">
           {loading && <div className="px-5 py-10 text-center text-sm text-muted-foreground">Loading…</div>}
           {error && <div className="px-5 py-10 text-center text-sm text-destructive">{error}</div>}

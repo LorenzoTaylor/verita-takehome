@@ -3,7 +3,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import PageLayout from "@/components/PageLayout"
-import { fetchUsage, type UsageEvent, type UsageFilters } from "@/api"
+import { fetchUsage, type UsageEvent, type UsageFilters, API_BASE } from "@/api"
+
+type ApiKey = { id: string; name: string; prefix: string }
 
 export default function UsagePage({ token }: { token: string }) {
   const [events, setEvents] = useState<UsageEvent[]>([])
@@ -12,6 +14,14 @@ export default function UsagePage({ token }: { token: string }) {
   const [error, setError] = useState("")
   const [filters, setFilters] = useState<UsageFilters>({})
   const [pending, setPending] = useState<UsageFilters>({})
+  const [keyMap, setKeyMap] = useState<Record<string, ApiKey>>({})
+
+  useEffect(() => {
+    fetch(`${API_BASE}/v1/api-keys`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((keys: ApiKey[]) => setKeyMap(Object.fromEntries(keys.map((k) => [k.id, k]))))
+      .catch(() => {})
+  }, [token])
 
   function load(f: UsageFilters, append = false) {
     setLoading(true)
@@ -54,9 +64,9 @@ export default function UsagePage({ token }: { token: string }) {
             onChange={(e) => setPending((p) => ({ ...p, to: e.target.value ? new Date(e.target.value).toISOString() : undefined }))}
           />
           <Input
-            placeholder="API key ID…"
+            placeholder="Filter by key…"
             className="h-8 text-xs w-44 font-mono"
-            onChange={(e) => setPending((p) => ({ ...p, api_key_id: e.target.value || undefined }))}
+            onChange={(e) => setPending((p) => ({ ...p, key_prefix: e.target.value || undefined }))}
           />
           <Button size="sm" className="h-8" onClick={applyFilters}>Apply</Button>
         </div>
@@ -90,11 +100,13 @@ export default function UsagePage({ token }: { token: string }) {
                 <td className="px-5 py-3 text-right font-mono-numeric">{e.units.toLocaleString()}</td>
                 <td className="px-5 py-3">
                   <Badge variant={e.status === "normal" ? "success" : "warning"}>
-                    <span className="w-1 h-1 rounded-full bg-current mr-1" />{e.status}
+                    {e.status}
                   </Badge>
                 </td>
                 <td className="px-5 py-3 font-mono-numeric text-xs text-muted-foreground">
-                  {e.api_key_id.slice(0, 8)}…
+                  {keyMap[e.api_key_id]
+                    ? `${keyMap[e.api_key_id].prefix}…`
+                    : `${e.api_key_id.slice(0, 8)}…`}
                 </td>
               </tr>
             ))}

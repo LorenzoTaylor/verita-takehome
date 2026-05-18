@@ -52,7 +52,7 @@ export default function InvoicesPage({ token }: { token: string }) {
                   <td className="px-5 py-3 text-[12.5px] text-muted-foreground">{formatPeriod(inv.period_start, inv.period_end)}</td>
                   <td className="px-5 py-3">
                     <Badge variant={statusVariant[inv.status]}>
-                      <span className="w-1 h-1 rounded-full bg-current mr-1" />{inv.status}
+                      {inv.status}
                     </Badge>
                   </td>
                   <td className="px-5 py-3 text-right font-mono-numeric font-medium">{formatMoney(inv.total_minor)}</td>
