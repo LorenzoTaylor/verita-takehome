@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
-import { fetchAllInvoices, formatMoney, formatPeriod, type InvoiceListItem } from "@/api"
+import { fetchInvoicesPage, formatMoney, formatPeriod, type InvoiceListItem } from "@/api"
 
 const statusVariant: Record<string, "secondary" | "info" | "success"> = {
   draft: "secondary",
@@ -11,22 +11,46 @@ const statusVariant: Record<string, "secondary" | "info" | "success"> = {
 
 export default function InvoicesPage({ token }: { token: string }) {
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([])
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    fetchAllInvoices(token)
-      .then(setInvoices)
+    fetchInvoicesPage(token)
+      .then((res) => {
+        setInvoices(res.data)
+        setCursor(res.next_cursor)
+        setHasMore(res.next_cursor !== null)
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [token])
+
+  async function loadMore() {
+    if (!cursor) return
+    setLoadingMore(true)
+    try {
+      const res = await fetchInvoicesPage(token, cursor)
+      setInvoices((prev) => [...prev, ...res.data])
+      setCursor(res.next_cursor)
+      setHasMore(res.next_cursor !== null)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   return (
     <>
       <div className="h-14 flex-shrink-0 border-b border-[hsl(var(--verita-border))] bg-white flex items-center px-7 gap-3.5">
         <h1 className="text-base font-semibold tracking-tight">Invoices</h1>
         {!loading && !error && (
-          <span className="text-[13px] text-muted-foreground">{invoices.length} total</span>
+          <span className="text-[13px] text-muted-foreground">
+            {invoices.length}{hasMore ? "+" : ""} invoices
+          </span>
         )}
       </div>
 
@@ -72,6 +96,17 @@ export default function InvoicesPage({ token }: { token: string }) {
             </table>
           )}
         </div>
+        {hasMore && (
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              {loadingMore ? "Loading…" : `Load more`}
+            </button>
+          </div>
+        )}
       </div>
     </>
   )

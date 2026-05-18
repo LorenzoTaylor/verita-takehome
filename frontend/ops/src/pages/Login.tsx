@@ -47,7 +47,6 @@ export default function Login({ onLogin }: { onLogin: (token: string) => void })
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-[12.5px] font-medium">Password</label>
-                <a className="text-[12.5px] font-medium text-primary hover:underline cursor-pointer">Reset</a>
               </div>
               <Input type="password" placeholder="••••••••" value={password}
                 onChange={(e) => setPassword(e.target.value)} />

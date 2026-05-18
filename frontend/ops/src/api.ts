@@ -101,6 +101,7 @@ export type OverviewStats = {
   open_invoices: number
   active_anomalies: number
   prev_active_anomalies: number
+  total_open_anomalies: number
 }
 
 export type RevenueDay = { date: string; revenue_minor: number }
@@ -145,9 +146,9 @@ export async function fetchOverview(token: string, days?: number): Promise<Overv
   return apiFetch(`/ops/overview${qs}`, token)
 }
 
-export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]> {
-  const res = await apiFetch<{ data: InvoiceListItem[]; next_cursor: string | null }>("/ops/invoices", token)
-  return res.data
+export async function fetchInvoicesPage(token: string, cursor?: string): Promise<{ data: InvoiceListItem[]; next_cursor: string | null }> {
+  const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
+  return apiFetch(`/ops/invoices${qs}`, token)
 }
 
 export async function fetchAllCredits(token: string): Promise<CreditListItem[]> {

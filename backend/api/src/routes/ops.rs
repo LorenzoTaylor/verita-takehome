@@ -478,6 +478,7 @@ struct OverviewStats {
     open_invoices: i64,
     active_anomalies: i64,
     prev_active_anomalies: i64,
+    total_open_anomalies: i64,
 }
 
 async fn get_overview(
@@ -545,11 +546,17 @@ async fn get_overview(
         .fetch_one(&state.db)
         .await?;
 
+    let total_open_anomalies: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM anomaly_flags WHERE resolved_at IS NULL")
+            .fetch_one(&state.db)
+            .await?;
+
     Ok(Json(OverviewStats {
         total_customers, prev_customers,
         total_revenue_minor, prev_revenue_minor,
         open_invoices,
         active_anomalies, prev_active_anomalies,
+        total_open_anomalies,
     }))
 }
 

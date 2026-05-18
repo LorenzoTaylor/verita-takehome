@@ -141,7 +141,6 @@ async fn flag_if_new(
              WHERE customer_id = $1
                AND signal_type = $2
                AND resolved_at IS NULL
-               AND flagged_at > now() - interval '2 hours'
          )",
     )
     .bind(customer_id)

@@ -117,19 +117,11 @@ A Postgres job table with `SKIP LOCKED` keeps it all in one place: the lock, the
 
 ---
 
-## 7. Operational observability
-
-**What to alert on.** The anomaly job writes five signals to `anomaly_flags`: usage 10× 30-day average, zero-usage drop, high-frequency `request_id` (retry loop), invoice spike vs. prior month, API key used from multiple IPs in a short window. The first two are worth waking someone up for — a spike or sudden zero usually means something broke in the customer's integration or the ingest pipeline. The rest go to the ops review queue.
-
-**How to debug a wrong invoice.** Start with the drift check: `SUM(units) FROM usage_events WHERE customer_id = $1 AND timestamp BETWEEN $start AND $end` vs `SUM(units_total) FROM usage_windows` for the same range. A gap means late events or a job that didn't finish. Then check `audit_log` for any line-item overrides or credits in that period. If there's still drift, rerun the window job — it's always safe and it overwrites stale totals. If numbers still don't line up, what's left is late events with `status = 'late'`, which are intentionally excluded from the current window.
-
----
-
-## 8. What wasn't built
+## 7. What wasn't built
 
 **Event stream buffer.** `POST /v1/events` writes directly to Postgres. At 2,000 events/sec peak, a queue (Kafka or SQS) in front of ingestion is the standard buffer against spikes. It's purely additive: the consumer replaces the HTTP ingest path, nothing else changes.
 
-**MFA for ops users.** Ops has email/password login, no second factor. The audit log records damage, it doesn't prevent it. The identity behind those entries matters. A compromised ops account can issue fraudulent credits that are logged but not stopped.
+**MFA for ops users.** Ops has email/password login, no second factor. The audit log records damage, it doesn't prevent it. A compromised ops account can issue fraudulent credits that are logged but not stopped.
 
 Next priorities: Kafka ingest buffer, monthly partitioning on `usage_events`, Redis dedup for the fast path, MFA for ops users.
 
@@ -138,4 +130,13 @@ Next priorities: Kafka ingest buffer, monthly partitioning on `usage_events`, Re
 - **Alerting**: anomaly flags surface in the console but nothing pages; would wire to PagerDuty
 - **PDF invoices**: no download option; background job rendering to S3 is the next step
 - **Multi-currency**: all amounts are USD minor units; adding currency is a schema change, not an architectural one
-- **Password reset**: no reset flow; fine for a prototype, real auth service in production
+- **Password reset**: no reset flow; fine for a prototype, real auth service in prod
+- **`request_id_flood` and `multi_ip` anomaly signals**: in the schema, not in the job.
+
+---
+
+## 8. Operational observability
+
+**What to alert on.** The anomaly job flags three conditions: usage more than 10× a customer's rolling hourly average, a sudden drop to zero after a busy window, and an invoice more than 3× the prior month. The first two are worth waking someone up for — a spike or sudden zero usually means something broke in the customer's integration or the ingest pipeline. Invoice spikes go to the ops review queue.
+
+**How to debug a wrong invoice.** Start with the drift check: `SUM(units) FROM usage_events WHERE customer_id = $1 AND timestamp BETWEEN $start AND $end` vs `SUM(units_total) FROM usage_windows` for the same range. A gap means late events or a job that didn't finish. Then check `audit_log` for any line-item overrides or credits in that period. If there's still drift, rerun the window job — it's always safe and it overwrites stale totals. If numbers still don't line up, what's left is late events with `status = 'late'`, which are intentionally excluded from the current window.

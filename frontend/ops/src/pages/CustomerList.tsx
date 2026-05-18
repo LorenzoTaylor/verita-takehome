@@ -18,7 +18,7 @@ export default function CustomerList({ token }: { token: string }) {
       .then(setCustomers)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
-    fetchOverview(token).then((s) => setActiveAnomalies(s.active_anomalies)).catch(() => {})
+    fetchOverview(token).then((s) => setActiveAnomalies(s.total_open_anomalies)).catch(() => {})
   }, [token])
 
   const filtered = customers.filter(
@@ -40,7 +40,7 @@ export default function CustomerList({ token }: { token: string }) {
         <h1 className="text-base font-semibold tracking-tight">Customers</h1>
         <div className="ml-auto flex items-center gap-2">
           <Badge variant={activeAnomalies > 0 ? "warning" : "success"} className="mr-1">
-                        {activeAnomalies > 0 ? `${activeAnomalies} anomalies` : "all systems normal"}
+            {activeAnomalies > 0 ? `${activeAnomalies > 99 ? "99+" : activeAnomalies} anomalies` : "all systems normal"}
           </Badge>
         </div>
       </div>
