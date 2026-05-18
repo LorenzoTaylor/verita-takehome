@@ -93,7 +93,7 @@ export default function Dashboard({ token }: { token: string }) {
         <h1 className="text-base font-semibold tracking-tight">Dashboard</h1>
       </div>
 
-      <div className="p-7 max-w-[1280px] w-full">
+      <div className="p-7 w-full">
         {/* Page head */}
         <div className="flex items-end justify-between mb-5">
           <div>

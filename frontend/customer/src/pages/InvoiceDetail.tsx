@@ -34,7 +34,7 @@ export default function InvoiceDetail({ token }: { token: string }) {
         </h1>
       </div>
 
-      <div className="p-7 max-w-[1280px] w-full">
+      <div className="p-7 w-full">
         {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
         {error && <div className="text-sm text-destructive">{error}</div>}
         {invoice && (

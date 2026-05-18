@@ -11,7 +11,7 @@ export default function PageLayout({ title, actions, children }: Props) {
         <h1 className="text-base font-semibold tracking-tight">{title}</h1>
         {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
       </div>
-      <div className="p-7 w-full max-w-[1280px]">
+      <div className="p-7 w-full">
         {children}
       </div>
     </>
