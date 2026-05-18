@@ -1,6 +1,13 @@
-[Design doc](DESIGN.md) · [Video walkthrough](https://loom.com/TODO) 
+[Design doc](DESIGN.md) · [Video walkthrough](https://youtu.be/iqO2MYE2cAQ) 
 
-**Extras:** [Live demo](https://verita.lore.dev) · [Decision log](decision.md)
+**Extras:** [Customer portal](https://customer-frontend-production-59e0.up.railway.app/) · [Ops console](https://ops-frontend-production.up.railway.app/) · [Decision log](decision.md)
+
+### Live demo credentials
+
+| | Email | Password |
+|---|---|---|
+| Customer portal | `test-7lv2wb@example.com` | `customer-local-password` |
+| Ops console | `ops@example.com` | `ops-local-password` |
 
 ---
 

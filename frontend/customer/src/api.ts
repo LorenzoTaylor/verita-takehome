@@ -54,8 +54,10 @@ function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}` }
 }
 
+const API_BASE = import.meta.env.VITE_API_URL ?? ""
+
 async function apiFetch<T>(url: string, token: string): Promise<T> {
-  const res = await fetch(url, { headers: authHeaders(token) })
+  const res = await fetch(API_BASE + url, { headers: authHeaders(token) })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error ?? `HTTP ${res.status}`)
@@ -64,7 +66,7 @@ async function apiFetch<T>(url: string, token: string): Promise<T> {
 }
 
 export async function login(email: string, password: string): Promise<string> {
-  const res = await fetch("/v1/auth/login", {
+  const res = await fetch(API_BASE + "/v1/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),

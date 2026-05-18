@@ -33,7 +33,8 @@ async fn main() -> anyhow::Result<()> {
         .to_string();
 
     let suffix: String = key.chars().skip(3).take(6).collect();
-    let email = format!("test-{}@example.com", suffix.to_lowercase());
+    let email = std::env::var("CUSTOMER_SEED_EMAIL")
+        .unwrap_or_else(|_| format!("test-{}@example.com", suffix.to_lowercase()));
 
     let customer_password =
         std::env::var("CUSTOMER_SEED_PASSWORD").unwrap_or_else(|_| "customer-local-password".into());

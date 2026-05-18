@@ -19,8 +19,10 @@ export type AnomalyFlag = {
 
 export type CustomerDetail = Customer & { invoices: Invoice[]; credits: Credit[] }
 
+const API_BASE = import.meta.env.VITE_API_URL ?? ""
+
 async function apiFetch<T>(url: string, token: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetch(API_BASE + url, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...init?.headers },
   })
@@ -32,7 +34,7 @@ async function apiFetch<T>(url: string, token: string, init?: RequestInit): Prom
 }
 
 export async function login(email: string, password: string): Promise<string> {
-  const res = await fetch("/ops/auth/login", {
+  const res = await fetch(API_BASE + "/ops/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
