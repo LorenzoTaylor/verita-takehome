@@ -27,7 +27,7 @@ npm install && cd frontend/customer && npm install && cd ../ops && npm install &
 
 # 4. Run migrations (start the backend briefly — it migrates on startup, then Ctrl+C)
 cd backend/api && cargo run --bin api
-# Once you see "listening on 0.0.0.0:8080", press Ctrl+C to stop it
+# Once you see "Running `/Users/", press Ctrl+C to stop it
 cd ../..
 
 # 5. Seed the database
