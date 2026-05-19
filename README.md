@@ -25,16 +25,21 @@ cp .env.example .env
 # 3. Install frontend deps
 npm install && cd frontend/customer && npm install && cd ../ops && npm install && cd ../..
 
-# 4. Seed the database (runs migrations automatically on first start)
+# 4. Run migrations (start the backend briefly — it migrates on startup, then Ctrl+C)
+cd backend/api && cargo run --bin api
+# Once you see "listening on 0.0.0.0:8080", press Ctrl+C to stop it
+cd ../..
+
+# 5. Seed the database
 cd backend/api && cargo run --bin seed && cd ../..
 
-# 5. (Optional) Generate realistic multi-customer data
+# 6. (Optional) Generate realistic multi-customer data
 #    Adds 50 customers (whale/medium/small/churned/new/occasional profiles),
 #    ~3M usage events over 12 months, ~500 invoices, and 4 price plans.
 #    Takes 2–5 minutes.
 cd backend/api && cargo run --bin generate && cd ../..
 
-# 6. Run everything
+# 7. Run everything
 npm run dev
 ```
 
